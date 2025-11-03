@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { React, useEffect, useRef, useState } from "react";
 import { sendMessage } from "../api/chat";
 
 function uid(prefix) {
