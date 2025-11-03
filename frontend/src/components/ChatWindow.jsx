@@ -74,6 +74,7 @@ export default function ChatWindow() {
           input={input}
           setInput={setInput}
           onSend={onSend}
+          onKeyDown={onKeyDown}
           pending={pending}
         />
       </div>
@@ -157,7 +158,7 @@ function Dot({ delay }) {
   );
 }
 
-function Composer({ input, setInput, onSend, pending }) {
+function Composer({ input, setInput, onSend, onKeyDown, pending }) {
   return (
     <div className="p-3 sm:p-4 border-t border-white/60 bg-white/60 rounded-b-3xl">
       <div className="flex gap-2">
