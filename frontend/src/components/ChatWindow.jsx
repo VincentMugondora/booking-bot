@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { sendMessage } from "../api/chat";
 
 function uid(prefix) {
@@ -86,7 +86,7 @@ function Header() {
   return (
     <div className="px-5 py-4 border-b border-white/60 flex items-center justify-between bg-white/60 rounded-t-3xl">
       <div className="flex items-center gap-3">
-        <div className="size-10 rounded-full bg-indigo-600 text-white grid place-items-center font-semibold shadow-md">BA</div>
+        <div className="w-10 h-10 rounded-full bg-indigo-600 text-white grid place-items-center font-semibold shadow-md">BA</div>
         <div>
           <div className="font-semibold text-gray-900">Booking Assistant</div>
           <div className="text-xs text-gray-500">Ask me to find and book providers</div>
@@ -115,7 +115,7 @@ function Bubble({ role, text }) {
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
       {!isUser && (
         <div className="hidden sm:flex items-start mr-2">
-          <div className="size-8 rounded-full bg-indigo-600 text-white grid place-items-center text-xs font-semibold">BA</div>
+          <div className="w-8 h-8 rounded-full bg-indigo-600 text-white grid place-items-center text-xs font-semibold">BA</div>
         </div>
       )}
       <div
