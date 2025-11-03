@@ -31,8 +31,11 @@ def chat(in_: ChatIn):
     )
 
     messages = [{"role": "user", "content": [{"text": in_.message}]}]
-    resp = converse(messages=messages, system_prompt=SYSTEM_PROMPT)
-    reply = extract_text(resp) or "Sorry, I had trouble understanding."
+    try:
+        resp = converse(messages=messages, system_prompt=SYSTEM_PROMPT)
+        reply = extract_text(resp) or "Sorry, I had trouble understanding."
+    except Exception:
+        reply = "I'm having trouble reaching the AI right now. Please try again shortly."
 
     db.conversations.update_one(
         {"session_id": in_.session_id},
