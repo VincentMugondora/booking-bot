@@ -28,4 +28,3 @@ def health():
 @app.on_event("startup")
 def startup():
     init_indexes()
-init_indexes()
