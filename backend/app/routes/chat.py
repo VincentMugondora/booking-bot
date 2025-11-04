@@ -204,13 +204,13 @@ def chat(in_: ChatIn):
                 )
                 reg_reply = extract_text(resp) or (
                     "What's your full name?" if next_field == "name" else (
-                        "Where are you located?" if next_field == "location" else "Do you agree to our policy? (yes/no)"
+                        "Where are you located?" if next_field == "location" else f"Do you agree to our policy? (yes/no) {settings.POLICY_URL}"
                     )
                 )
             except Exception:
                 reg_reply = (
                     "What's your full name?" if next_field == "name" else (
-                        "Where are you located?" if next_field == "location" else "Do you agree to our policy? (yes/no)"
+                        "Where are you located?" if next_field == "location" else f"Do you agree to our policy? (yes/no) {settings.POLICY_URL}"
                     )
                 )
             users.update_one({"_id": u["_id"]}, {"$set": {"pending_field": next_field}})
