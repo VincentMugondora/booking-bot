@@ -249,6 +249,29 @@ def _find_nearby_providers(db, service: str, u: dict | None, desired_start: date
     enriched.sort(key=sort_key)
     return enriched[:5]
 
+def _llm_natural_reply(context_text: str, fast: bool = True, max_tokens: int = 180) -> str:
+    """Ask the LLM to produce a single friendly, conversational reply based on the provided context."""
+    try:
+        _mc = _variants(settings.BEDROCK_FAST_MODEL_ID) if fast else (_variants(settings.BEDROCK_MODEL_ID) + _variants("anthropic.claude-3-haiku-20240307"))
+        # de-duplicate while preserving order
+        seen = set(); model_candidates = []
+        for m in _mc:
+            if m and m not in seen:
+                model_candidates.append(m); seen.add(m)
+        messages = [{"role": "user", "content": [{"text": context_text}]}]
+        for mid in model_candidates:
+            try:
+                resp = converse(messages=messages, system_prompt=SYSTEM_PROMPT, model_id=mid, max_tokens=max_tokens, temperature=0.3 if fast else 0.5)
+                reply = extract_text(resp)
+                if reply:
+                    return reply
+            except Exception:
+                continue
+    except Exception:
+        pass
+    # fallback
+    return "Could you share a bit more so I can help? For example, the task and a suitable time."
+
 def _print_msg(conv_id: str, phone: str | None, role: str, text: str) -> None:
     try:
         ts = datetime.utcnow().isoformat()
