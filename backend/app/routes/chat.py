@@ -785,7 +785,9 @@ def chat(in_: ChatIn):
             return ChatOut(reply=pr)
         # Friendly greeting handler
         if not merged.get("service") and any(g in lm for g in ("hi", "hello", "hey", "hie", "morning", "afternoon", "evening")):
-            pr = "Hi! What service would you like to book, and when? For example: 'plumber tomorrow 9am'."
+            # Let the LLM craft a friendly greeting asking for service and preferred time in one sentence
+            context_text = "The user greeted you. Reply with a short friendly message asking for service and preferred time in one sentence."
+            pr = _llm_natural_reply(context_text, fast=True, max_tokens=60)
             db.conversations.update_one({"session_id": conv_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
             _print_msg(conv_id, phone, "assistant", pr)
             return ChatOut(reply=pr)
@@ -827,7 +829,9 @@ def chat(in_: ChatIn):
                         "available": bool(avail) if isinstance(avail, bool) else avail,
                     })
                 lines.append("Reply with 1-" + str(len(opts)) + " to choose, or say 'recommend'.")
-                pr = "\n".join(lines)
+                # Let the LLM present the provider list naturally and ask for a number or 'recommend'
+                context_text = "Provide a short reply listing the providers below and ask the user to reply with a number or say 'recommend'.\n" + "\n".join(lines)
+                pr = _llm_natural_reply(context_text, fast=True, max_tokens=160)
                 db.conversations.update_one({"session_id": conv_id}, {"$set": {"provider_options": opts, "booking_draft": merged, "booking_state": "awaiting_provider_choice"}})
                 db.conversations.update_one({"session_id": conv_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
                 _print_msg(conv_id, phone, "assistant", pr)
@@ -849,19 +853,21 @@ def chat(in_: ChatIn):
             _print_msg(conv_id, phone, "assistant", pr)
             return ChatOut(reply=pr)
         elif extracted and missing:
-            # Build a helpful prompt with short explanations (hide internal fields)
-            help_text = {
-                "service": "e.g., plumber, web development, electrician",
-                "issue": "what you need done, e.g., 'leaking sink' or 'build a landing page'",
-                "date_time": "e.g., 'tomorrow 9am' or 'today 3pm'",
-            }
-            friendly_labels = {
-                "service": "service",
-                "issue": "task description",
-                "date_time": "time",
-            }
-            parts = [f"{friendly_labels.get(fld)} ({help_text.get(fld)})" for fld in missing]
-            pr = "Could you provide: " + ", ".join(parts) + "?"
+            # Ask the LLM to request missing info naturally based on known details
+            ctx = ["Compose a short, friendly reply asking only for the missing details."]
+            if merged.get("service"):
+                ctx.append(f"- service: {merged.get('service')}")
+            if merged.get("issue"):
+                ctx.append(f"- task: {merged.get('issue')}")
+            if merged.get("date_time"):
+                ctx.append(f"- date_time: {merged.get('date_time')}")
+            addr = merged.get("address") or {}
+            if any(addr.get(k) for k in ("street","suburb","city")):
+                addr_str = ", ".join([p for p in [addr.get("street"), addr.get("suburb"), addr.get("city")] if p])
+                ctx.append(f"- address: {addr_str}")
+            ctx.append("Missing: " + ", ".join(missing))
+            context_text = "\n".join(ctx)
+            pr = _llm_natural_reply(context_text, fast=True, max_tokens=140)
             db.conversations.update_one({"session_id": conv_id}, {"$set": {"booking_draft": merged, "booking_state": "collecting"}})
             db.conversations.update_one({"session_id": conv_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
             _print_msg(conv_id, phone, "assistant", pr)
