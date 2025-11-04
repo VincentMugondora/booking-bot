@@ -1,5 +1,8 @@
 import boto3
 from app.config import settings
+from botocore.exceptions import ClientError
+import time
+import random
 
 _bedrock = boto3.client("bedrock-runtime", region_name=settings.AWS_REGION)
 
@@ -14,7 +17,18 @@ def converse(messages: list, system_prompt: str | None = None, tools: list | Non
         req["system"] = [{"text": system_prompt}]
     if tools:
         req["toolConfig"] = {"tools": tools}
-    return _bedrock.converse(**req)
+    # Retry on throttling with exponential backoff + jitter
+    retries = 5
+    for i in range(retries):
+        try:
+            return _bedrock.converse(**req)
+        except ClientError as e:
+            code = e.response.get("Error", {}).get("Code", "")
+            if code == "ThrottlingException" and i < retries - 1:
+                wait = min(2 ** i, 16) + random.uniform(0, 0.3)
+                time.sleep(wait)
+                continue
+            raise
 
 def extract_text(resp: dict) -> str:
     out = resp.get("output", {}).get("message", {}).get("content", [])
