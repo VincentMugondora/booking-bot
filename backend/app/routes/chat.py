@@ -203,7 +203,7 @@ def chat(in_: ChatIn):
                           f"Coverage: {pdoc.get('coverage','-')}\nActive: {'Yes' if pdoc.get('active') else 'No'}\n"
                           f"Policy agreed: {'Yes' if pdoc.get('policy_agreed') else 'No'}\n"
                           f"Provider ID: {str(pdoc.get('_id'))}")
-                db.conversations.update_one({"session_id": in_.session_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
+                db.conversations.update_one({"session_id": conv_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
                 return ChatOut(reply=pr)
             # /bookings: list next 5 bookings
             if cmd == '/bookings':
