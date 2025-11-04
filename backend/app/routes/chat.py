@@ -579,9 +579,9 @@ def chat(in_: ChatIn):
                 merged["provider_name"] = chosen.get("name") or "Provider"
                 db.conversations.update_one({"session_id": conv_id}, {"$set": {"booking_draft": merged}, "$unset": {"provider_options": ""}})
                 # Now decide next prompt
-                required = ["service", "issue", "date_time", "address", "provider_id"]
+                required = ["service", "issue", "date_time", "provider_id"]
                 missing = [k for k in required if not merged.get(k)]
-                if not missing:
+                if not missing and merged.get("issue"):
                     addr = merged.get("address") or {}
                     addr_str = ", ".join([p for p in [addr.get("street"), addr.get("suburb"), addr.get("city")] if p])
                     dt_str = merged.get("date_time")
@@ -681,11 +681,22 @@ def chat(in_: ChatIn):
                 score = len(msg_tokens & st_tokens)
                 if score > best_score or (score == best_score and cand and len(st) > len(cand)):
                     best_score = score
-                    cand = st
-            if best_score > 0 and cand:
-                merged["service"] = cand
-        required = ["service", "issue", "date_time", "address", "provider_id"]
-        missing = [k for k in required if not merged.get(k)]
+            parts = [f"- {('what service' if fld=='service' else ('what you need done' if fld=='issue' else 'when'))}: {help_text.get(fld)}" for fld in missing]
+            extra = []
+            if (not merged.get("provider_id")) and merged.get("service"):
+                extra.append("I'll list nearby providers so you can pick a number or say 'recommend'.")
+            pr = "Here\u2019s what I need:\n" + "\n".join(parts)
+            if extra:
+                pr += "\n" + " ".join(extra)
+            db.conversations.update_one({"session_id": conv_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
+            _print_msg(conv_id, phone, "assistant", pr)
+            return ChatOut(reply=pr)
+        # Friendly greeting handler
+        if not merged.get("service") and any(g in lm for g in ("hi", "hello", "hey", "hie", "morning", "afternoon", "evening")):
+            pr = "Hi! What service would you like to book, and when? For example: 'plumber tomorrow 9am'."
+            db.conversations.update_one({"session_id": conv_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
+            _print_msg(conv_id, phone, "assistant", pr)
+            return ChatOut(reply=pr)
         # If service identified but no provider chosen, list nearby options
         if merged.get("service") and not merged.get("provider_id") and not prov_opts:
             u_doc = db.users.find_one({"phone": phone}) or None
@@ -731,7 +742,7 @@ def chat(in_: ChatIn):
                 return ChatOut(reply=pr)
         if merged and merged != draft:
             db.conversations.update_one({"session_id": conv_id}, {"$set": {"booking_draft": merged, "booking_state": "collecting"}})
-        if merged and not missing:
+        if merged and not missing and merged.get("issue"):
             addr = merged.get("address") or {}
             addr_str = ", ".join([p for p in [addr.get("street"), addr.get("suburb"), addr.get("city")] if p])
             dt_str = merged.get("date_time")
@@ -746,7 +757,19 @@ def chat(in_: ChatIn):
             _print_msg(conv_id, phone, "assistant", pr)
             return ChatOut(reply=pr)
         elif extracted and missing:
-            pr = "Could you provide the following info: " + ", ".join(missing) + "?"
+            # Build a helpful prompt with short explanations (hide internal fields)
+            help_text = {
+                "service": "e.g., plumber, web development, electrician",
+                "issue": "what you need done, e.g., 'leaking sink' or 'build a landing page'",
+                "date_time": "e.g., 'tomorrow 9am' or 'today 3pm'",
+            }
+            friendly_labels = {
+                "service": "service",
+                "issue": "task description",
+                "date_time": "time",
+            }
+            parts = [f"{friendly_labels.get(fld)} ({help_text.get(fld)})" for fld in missing]
+            pr = "Could you provide: " + ", ".join(parts) + "?"
             db.conversations.update_one({"session_id": conv_id}, {"$set": {"booking_draft": merged, "booking_state": "collecting"}})
             db.conversations.update_one({"session_id": conv_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
             _print_msg(conv_id, phone, "assistant", pr)

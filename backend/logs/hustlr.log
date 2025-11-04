@@ -105,3 +105,163 @@ Provider ID: 6909f1596f914b83e7569f13
 Would you like to go live and start receiving booking requests now? (yes/no)
 2025-11-04 14:38:57,882 INFO app.routes.chat: 2025-11-04T12:38:57.882508 Hustlr [263777530322|cccf0768-a64e-4274-8dbe-c9273576b191] USER: l want to book a web developer
 2025-11-04 14:38:58,366 INFO app.routes.chat: 2025-11-04T12:38:58.366025 Hustlr [263777530322|cccf0768-a64e-4274-8dbe-c9273576b191] ASSISTANT: Could you provide the following info: service, issue, date_time, provider_id?
+2025-11-04 14:47:18,241 INFO app.routes.chat: 2025-11-04T12:47:18.241016 Hustlr [120363416287054477|d75062cb-e270-4959-91d3-56ab538cd00c] USER: Mhanyai umo ⤴️⤴️⤴️
+2025-11-04 14:47:20,715 INFO app.routes.chat: 2025-11-04T12:47:20.715267 Hustlr [120363416287054477|d75062cb-e270-4959-91d3-56ab538cd00c] ASSISTANT: Do you agree to our customer policy? You can find it here: https://hustlr.app/policy
+2025-11-04 14:50:44,408 INFO app.routes.chat: 2025-11-04T12:50:44.407854 Hustlr [263777530322|cccf0768-a64e-4274-8dbe-c9273576b191] USER: Reset
+2025-11-04 14:50:45,085 INFO app.routes.chat: 2025-11-04T12:50:45.084972 Hustlr [263777530322|cccf0768-a64e-4274-8dbe-c9273576b191] ASSISTANT: Could you provide the following info: service, issue, date_time, provider_id?
+2025-11-04 14:51:22,059 INFO app.routes.chat: 2025-11-04T12:51:22.024922 Hustlr [263777530322|cccf0768-a64e-4274-8dbe-c9273576b191] USER: Hello
+2025-11-04 14:51:22,582 INFO app.routes.chat: 2025-11-04T12:51:22.582524 Hustlr [263777530322|cccf0768-a64e-4274-8dbe-c9273576b191] ASSISTANT: Could you provide the following info: service, issue, date_time, provider_id?
+2025-11-04 14:51:44,225 INFO app.routes.chat: 2025-11-04T12:51:44.224819 Hustlr [263777530322|cccf0768-a64e-4274-8dbe-c9273576b191] USER: Web Development, tomorrow 9am
+2025-11-04 14:51:44,936 INFO app.routes.chat: 2025-11-04T12:51:44.936748 Hustlr [263777530322|cccf0768-a64e-4274-8dbe-c9273576b191] ASSISTANT: Could you provide the following info: issue, provider_id?
+2025-11-04 14:51:54,930 INFO app.routes.chat: 2025-11-04T12:51:54.930639 Hustlr [263777530322|cccf0768-a64e-4274-8dbe-c9273576b191] USER: What is issue
+2025-11-04 14:51:55,395 INFO app.routes.chat: 2025-11-04T12:51:55.394882 Hustlr [263777530322|cccf0768-a64e-4274-8dbe-c9273576b191] ASSISTANT: Could you provide the following info: issue, provider_id?
+2025-11-04 14:52:18,246 INFO app.routes.chat: 2025-11-04T12:52:18.246773 Hustlr [263777530322|cccf0768-a64e-4274-8dbe-c9273576b191] USER: What is issue and provider_id
+2025-11-04 14:52:18,821 INFO app.routes.chat: 2025-11-04T12:52:18.821512 Hustlr [263777530322|cccf0768-a64e-4274-8dbe-c9273576b191] ASSISTANT: Could you provide the following info: issue, provider_id?
+2025-11-04 14:55:32,989 INFO app.routes.chat: 2025-11-04T12:55:32.989405 Hustlr [120363416287054477|d75062cb-e270-4959-91d3-56ab538cd00c] USER: *Advertise your business with us*
+
+
+🔴 *Essential a day*
+🟠 *Gold a week*.💮 
+🔵 *Premium a month l*
+
+●NB : Your advert has a potential to reach more than 100 000 potential customers per advert .
+
+For paid adverts 
+
+https://wa.me/+263717308465?text=Hie+Popsey+I+want+to+advertise
+2025-11-04 14:55:35,672 INFO app.routes.chat: 2025-11-04T12:55:35.672347 Hustlr [120363416287054477|d75062cb-e270-4959-91d3-56ab538cd00c] ASSISTANT: Do you agree to our customer policy? (Customer policy: https://hustlr.app/policy)
+2025-11-04 14:56:06,314 INFO app.routes.chat: 2025-11-04T12:56:06.313656 Hustlr [120363405151421590|e581f76a-a32c-4811-9ca0-732d8d1eb4db] USER: *Advertise your business with us*
+
+
+🔴 *Essential a day*
+🟠 *Gold a week*.💮 
+🔵 *Premium a month l*
+
+●NB : Your advert has a potential to reach more than 100 000 potential customers per advert .
+
+For paid adverts 
+
+https://wa.me/+263717308465?text=Hie+Popsey+I+want+to+advertise
+2025-11-04 14:56:07,915 INFO app.routes.chat: 2025-11-04T12:56:07.915567 Hustlr [120363405151421590|e581f76a-a32c-4811-9ca0-732d8d1eb4db] ASSISTANT: What is your policy agreement status? You can review our customer policy at https://hustlr.app/policy.
+2025-11-04 14:59:08,252 INFO app.routes.chat: 2025-11-04T12:59:08.252250 Hustlr [120363416287054477|d75062cb-e270-4959-91d3-56ab538cd00c] USER: Chinamwali online lessons with Tete
+Chinamwali chema ladies
+Poita zve chinamwali chema Kool dudes panonaka pemukadzi unotopaudzwa nemunhu kadzi
+
+On promotion $10 pinda mufestive uchinaka with tete vevànhu
+
+https://chat.whatsapp.com/KO3pkFNWnWd92iFrotkF2M?mode=ems_copy_t
+2025-11-04 14:59:10,937 INFO app.routes.chat: 2025-11-04T12:59:10.937486 Hustlr [120363416287054477|d75062cb-e270-4959-91d3-56ab538cd00c] ASSISTANT: Do you agree to our customer policy? (Customer policy: https://hustlr.app/policy)
+2025-11-04 14:59:39,269 INFO app.routes.chat: 2025-11-04T12:59:39.269127 Hustlr [120363405151421590|e581f76a-a32c-4811-9ca0-732d8d1eb4db] USER: Chinamwali online lessons with Tete
+Chinamwali chema ladies
+Poita zve chinamwali chema Kool dudes panonaka pemukadzi unotopaudzwa nemunhu kadzi
+
+On promotion $10 pinda mufestive uchinaka with tete vevànhu
+
+https://chat.whatsapp.com/KO3pkFNWnWd92iFrotkF2M?mode=ems_copy_t
+2025-11-04 14:59:41,236 INFO app.routes.chat: 2025-11-04T12:59:41.235670 Hustlr [120363405151421590|e581f76a-a32c-4811-9ca0-732d8d1eb4db] ASSISTANT: What is your policy agreement status? You can review our customer policy here: https://hustlr.app/policy
+2025-11-04 15:00:02,854 INFO app.routes.chat: 2025-11-04T13:00:02.854152 Hustlr [120363422812752103|85cc1191-1c96-4321-b262-be5dbf152b82] USER: Chinamwali online lessons with Tete
+Chinamwali chema ladies
+Poita zve chinamwali chema Kool dudes panonaka pemukadzi unotopaudzwa nemunhu kadzi
+
+On promotion $10 pinda mufestive uchinaka with tete vevànhu
+
+https://chat.whatsapp.com/KO3pkFNWnWd92iFrotkF2M?mode=ems_copy_t
+2025-11-04 15:00:04,609 INFO app.routes.chat: 2025-11-04T13:00:04.609555 Hustlr [120363422812752103|85cc1191-1c96-4321-b262-be5dbf152b82] ASSISTANT: What is your location for the Chinamwali online lessons with Tete?
+2025-11-04 15:00:47,725 INFO app.routes.chat: 2025-11-04T13:00:47.724594 Hustlr [120363387354286057|f3d488d6-311f-4037-8f1f-fe8b3a8322a0] USER: *Hello Zimbabwe ne new members welcome ,hewo muvhunzo tizivane ,zvondibatsira pakuziva ma videos ekukupayi .Vakaroora or kuroorwa .”*
+
+*Kurora ❤️*
+*Kuroorwa 👍*
+*vasina kuwanana*🤣
+*vakashaikirwa*😭
+
+*1k reactions to unlock ma videos💦 ,munhu wese react*
+2025-11-04 15:00:48,983 INFO app.routes.chat: 2025-11-04T13:00:48.983483 Hustlr [120363387354286057|f3d488d6-311f-4037-8f1f-fe8b3a8322a0] ASSISTANT: What is your policy agreement?
+2025-11-04 15:05:21,796 INFO app.routes.chat: 2025-11-04T13:05:21.796221 Hustlr [263777530322|cccf0768-a64e-4274-8dbe-c9273576b191] USER: Hello
+2025-11-04 15:05:22,633 INFO app.routes.chat: 2025-11-04T13:05:22.633482 Hustlr [263777530322|cccf0768-a64e-4274-8dbe-c9273576b191] ASSISTANT: Got it! Booking a provider for 'None' on 2025-11-05 09:00 AM at Mufakose Harare. Confirm?
+2025-11-04 15:05:32,057 INFO app.routes.chat: 2025-11-04T13:05:32.056842 Hustlr [263777530322|cccf0768-a64e-4274-8dbe-c9273576b191] USER: No
+2025-11-04 15:05:32,803 INFO app.routes.chat: === Hustlr Conversation cccf0768-a64e-4274-8dbe-c9273576b191 ===
+Phone: 263777530322
+Started: 2025-11-04T09:58:25.860436
+Transcript:
+USER: hello
+ASSISTANT: Hello! I'm Hustlr, your friendly WhatsApp booking assistant. How can I help you today? 🙂
+USER: hello
+ASSISTANT: Hello! This is Hustlr, your friendly WhatsApp booking assistant. How can I help you today? 😊
+USER: hello
+ASSISTANT: Hello! 👋 How can I assist you today?
+USER: l want to book a plumber
+ASSISTANT: Great, I'd be happy to help you book a plumber! A few quick questions to get started:
+
+What is the address where you need the plumber to come?
+USER: 17 Tagutapadare Mufakose Harare
+ASSISTANT: Okay, let me look into that address for you. Just to confirm, is this the location you'd like me to book a service for? 🤔
+USER: yes
+ASSISTANT: Hello! How can I assist you today? I'm Hustlr, your friendly booking assistant. What would you like help with?
+USER: hello
+ASSISTANT: Hello! How can I assist you today? I'm Hustlr, your friendly WhatsApp booking assistant. 😊
+USER: l want to book a plumber for tomorrow at 400pm l have a leaking sink in my kitchen
+ASSISTANT: Okay, let me help you book a plumber for your leaking kitchen sink tomorrow at 4pm. 😊
+
+A few quick questions to get the booking set up:
+
+What is the address where the plumber should come?
+USER: 17 Tagutapadare Mufakse
+ASSISTANT: I'm sorry, I don't recognize that address. Could you please provide the full address or location you would like to book a service for? I'd be happy to assist you once I have the complete details.
+USER: 17 Tagutapadare Mufakose Harare
+ASSISTANT: 👋 Hello! I'd be happy to assist you with a local service booking. Could you please provide me with a few more details about the type of service you're looking for? That way I can try to match you with the best provider in your area.
+USER: yes
+ASSISTANT: Hello! How can I assist you today? I'm Hustlr, your friendly WhatsApp booking assistant. 😊
+USER: l want to book a plumber for tomorrow at 400pm l have a leaking sink in my kitchen
+ASSISTANT: Got it! Booking a plumber for 'tomorrow' on 2025-11-05 04:00 PM at Mufakose Harare. Confirm?
+USER: confirm
+ASSISTANT: Done! Your plumber is booked for 2025-11-05 04:00 PM at Mufakose Harare.
+USER: hello
+ASSISTANT: Could you provide the following info: service, issue, date_time, provider_id?
+USER: l want to register as a provider
+ASSISTANT: Great! Let's get you registered as a service provider. What's your full name?
+USER: Vincent Mugondora
+ASSISTANT: Thanks! What type of service do you provide? (e.g., plumbing, electrical, cleaning)
+USER: Web Development
+USER: l want to register as a provider
+ASSISTANT: Where is your service located or what area do you cover? (send city/suburb or share current location). Provider policy: https://hustlr.app/provider-policy
+USER: Harare
+ASSISTANT: Do you agree to our service provider policy and terms? (yes/no)
+USER: yes
+ASSISTANT: ✅ Thank you! You're now registered as a service provider.
+Provider Name: Vincent Mugondora
+Service Type: l want to register as a provider
+Coverage: Harare
+Policy Agreed: Yes
+Provider ID: 6909f1596f914b83e7569f13
+
+Would you like to go live and start receiving booking requests now? (yes/no)
+USER: l want to book a web developer
+ASSISTANT: Could you provide the following info: service, issue, date_time, provider_id?
+USER: Reset
+ASSISTANT: Could you provide the following info: service, issue, date_time, provider_id?
+USER: Hello
+ASSISTANT: Could you provide the following info: service, issue, date_time, provider_id?
+USER: Web Development, tomorrow 9am
+ASSISTANT: Could you provide the following info: issue, provider_id?
+USER: What is issue
+ASSISTANT: Could you provide the following info: issue, provider_id?
+USER: What is issue and provider_id
+ASSISTANT: Could you provide the following info: issue, provider_id?
+USER: Hello
+ASSISTANT: Got it! Booking a provider for 'None' on 2025-11-05 09:00 AM at Mufakose Harare. Confirm?
+USER: No
+ASSISTANT: No problem. You're registered but not live. Say 'go live' anytime to start receiving requests.
+2025-11-04 15:05:46,642 INFO app.routes.chat: 2025-11-04T13:05:46.642641 Hustlr [263777530322|a2486c80-47e1-437a-b75c-e2907c7b4e6d] USER: Go live
+2025-11-04 15:05:47,293 INFO app.routes.chat: 2025-11-04T13:05:47.293466 Hustlr [263777530322|a2486c80-47e1-437a-b75c-e2907c7b4e6d] ASSISTANT: Here’s what I need:
+
+2025-11-04 15:05:57,390 INFO app.routes.chat: 2025-11-04T13:05:57.390324 Hustlr [263777530322|a2486c80-47e1-437a-b75c-e2907c7b4e6d] USER: What
+2025-11-04 15:05:58,153 INFO app.routes.chat: 2025-11-04T13:05:58.152938 Hustlr [263777530322|a2486c80-47e1-437a-b75c-e2907c7b4e6d] ASSISTANT: Here’s what I need:
+
+2025-11-04 15:06:08,303 INFO app.routes.chat: 2025-11-04T13:06:08.303175 Hustlr [120363373158507098|1f06cde8-2b32-4f44-87f6-964764f1873b] USER: https://whatsapp.com/channel/0029VbBwl7yHwXbFVeVAgS17
+2025-11-04 15:06:10,559 INFO app.routes.chat: 2025-11-04T13:06:10.558917 Hustlr [120363373158507098|1f06cde8-2b32-4f44-87f6-964764f1873b] ASSISTANT: What is your name?
+2025-11-04 15:06:26,168 INFO app.routes.chat: 2025-11-04T13:06:26.167811 Hustlr [263777530322|a2486c80-47e1-437a-b75c-e2907c7b4e6d] USER: Hello
+2025-11-04 15:06:26,519 INFO app.routes.chat: 2025-11-04T13:06:26.519521 Hustlr [263777530322|a2486c80-47e1-437a-b75c-e2907c7b4e6d] ASSISTANT: Here’s what I need:
+
+2025-11-04 15:06:37,082 INFO app.routes.chat: 2025-11-04T13:06:37.081802 Hustlr [263777530322|a2486c80-47e1-437a-b75c-e2907c7b4e6d] USER: Hello
+2025-11-04 15:06:37,402 INFO app.routes.chat: 2025-11-04T13:06:37.401879 Hustlr [263777530322|a2486c80-47e1-437a-b75c-e2907c7b4e6d] ASSISTANT: Here’s what I need:
+

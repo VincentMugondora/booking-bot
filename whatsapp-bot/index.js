@@ -72,8 +72,10 @@ async function startBot() {
     for (const msg of msgUpdate.messages) {
       if (!msg.message || msg.key.fromMe) continue
       const chatId = msg.key.remoteJid
-      // Ignore group chats
-      if (chatId.endsWith('@g.us')) continue
+      // Ignore group, channel, and broadcast/status messages
+      if (chatId.endsWith('@g.us')) continue // groups
+      if (chatId.endsWith('@newsletter')) continue // channels
+      if (chatId.endsWith('@broadcast') || chatId === 'status@broadcast') continue // broadcast/status
       const text = extractText(msg).trim()
       const location = extractLocation(msg)
       if (!text && !location) continue
