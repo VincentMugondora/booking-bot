@@ -164,6 +164,26 @@ def _eta_from_meters(distance_m: float | None, speed_kph: float = 35.0) -> int |
     minutes = km / speed_kph * 60.0
     return int(round(minutes))
 
+def _get_default_address(u: dict | None) -> dict | None:
+    if not u:
+        return None
+    addrs = u.get("addresses")
+    if isinstance(addrs, list) and addrs:
+        def_addr = None
+        for a in addrs:
+            if isinstance(a, dict) and a.get("is_default"):
+                def_addr = a
+                break
+        if not def_addr:
+            def_addr = addrs[0] if isinstance(addrs[0], dict) else None
+        if def_addr:
+            street = def_addr.get("street")
+            suburb = def_addr.get("suburb")
+            city = def_addr.get("city")
+            if street or suburb or city:
+                return {"street": street, "suburb": suburb, "city": city}
+    return None
+
 def _is_provider_available(db, provider_id: str, start_dt: datetime, end_dt: datetime) -> bool:
     if not provider_id or not start_dt or not end_dt:
         return True
@@ -559,8 +579,25 @@ def chat(in_: ChatIn):
         draft = conv_doc.get("booking_draft") or {}
         bstate = conv_doc.get("booking_state")
         prov_opts = conv_doc.get("provider_options") or []
+        addr_opts = conv_doc.get("address_options") or []
         lm = (in_.message or "").strip().lower()
         confirm_words = ("yes", "y", "confirm", "ok", "okay", "go ahead", "sure")
+
+        # Address selection handling (before provider selection)
+        if (bstate == "awaiting_address_choice" or (addr_opts and not draft.get("address"))):
+            chosen = None
+            m_sel = re.search(r"\b([1-9])\b", lm)
+            if m_sel:
+                idx = int(m_sel.group(1)) - 1
+                if 0 <= idx < len(addr_opts):
+                    chosen = addr_opts[idx]
+            if chosen:
+                merged = dict(draft)
+                merged["address"] = {"street": chosen.get("street"), "suburb": chosen.get("suburb"), "city": chosen.get("city")}
+                db.conversations.update_one({"session_id": conv_id}, {"$set": {"booking_draft": merged}, "$unset": {"address_options": ""}})
+                # continue flow below to compute missing fields
+                draft = merged
+                bstate = None
 
         # Provider selection handling (before confirmation)
         if (bstate == "awaiting_provider_choice" or (prov_opts and not draft.get("provider_id"))):
