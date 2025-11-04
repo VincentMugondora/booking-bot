@@ -73,13 +73,15 @@ async function startBot() {
       }
 
       try {
+        // show typing while we process
+        try { await sock.presenceSubscribe(chatId); await sock.sendPresenceUpdate('composing', chatId) } catch {}
         const payload = {
           session_id: chatId,
           user_id: chatId,
           message: text
         }
         const res = await axios.post(`${BACKEND_URL}/v1/chat`, payload, {
-          timeout: 20000,
+          timeout: 60000,
           headers: { 'Content-Type': 'application/json' }
         })
         const reply = res?.data?.reply || 'Sorry, I could not process that.'
@@ -87,6 +89,8 @@ async function startBot() {
       } catch (err) {
         const detail = err?.response?.data || err.message || String(err)
         await sock.sendMessage(chatId, { text: `Error from server: ${JSON.stringify(detail).slice(0, 500)}` }, { quoted: msg })
+      } finally {
+        try { await sock.sendPresenceUpdate('paused', chatId) } catch {}
       }
     }
   })
