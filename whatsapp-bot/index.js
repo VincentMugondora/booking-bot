@@ -1,7 +1,9 @@
 import 'dotenv/config'
-import makeWASocket, { useMultiFileAuthState, fetchLatestBaileysVersion } from '@whiskeysockets/baileys'
+import makeWASocket, { useMultiFileAuthState, fetchLatestBaileysVersion, DisconnectReason } from '@whiskeysockets/baileys'
 import axios from 'axios'
 import pino from 'pino'
+import qrcode from 'qrcode-terminal'
+import fs from 'node:fs/promises'
 
 const BACKEND_URL = process.env.BACKEND_URL || 'http://127.0.0.1:8000'
 const SESSION_DIR = process.env.SESSION_DIR || 'auth_info'
@@ -22,19 +24,53 @@ async function startBot() {
   const sock = makeWASocket({
     version,
     auth: state,
-    printQRInTerminal: true,
     logger: pino({ level: 'info' })
   })
 
   sock.ev.on('creds.update', saveCreds)
+
+  sock.ev.on('connection.update', (update) => {
+    const { connection, lastDisconnect, qr } = update
+    if (qr) {
+      console.log('Scan this QR with WhatsApp (Linked Devices):')
+      qrcode.generate(qr, { small: true })
+    }
+    if (connection === 'open') {
+      console.log('✅ WhatsApp connected')
+    } else if (connection === 'close') {
+      const code = lastDisconnect?.error?.output?.statusCode || lastDisconnect?.error?.statusCode || lastDisconnect?.error?.code
+      const shouldReconnect = code !== DisconnectReason.loggedOut
+      console.log('Connection closed. code=', code, 'reconnect=', shouldReconnect)
+      if (shouldReconnect) {
+        setTimeout(() => startBot().catch(() => {}), 2000)
+      } else {
+        console.log(`❌ Logged out. Delete the '${SESSION_DIR}' folder and run again to re-link.`)
+      }
+    }
+  })
 
   sock.ev.on('messages.upsert', async (msgUpdate) => {
     if (msgUpdate.type !== 'notify') return
     for (const msg of msgUpdate.messages) {
       if (!msg.message || msg.key.fromMe) continue
       const chatId = msg.key.remoteJid
+      // Ignore group chats
+      if (chatId.endsWith('@g.us')) continue
       const text = extractText(msg).trim()
       if (!text) continue
+
+      // Special command: /unlink — logout & clear session directory
+      if (text === '/unlink') {
+        try {
+          await sock.sendMessage(chatId, { text: 'Unlinking session... You may need to restart the bot and scan the QR again.' }, { quoted: msg })
+        } catch {}
+        try { await sock.logout() } catch {}
+        try { await fs.rm(SESSION_DIR, { recursive: true, force: true }) } catch {}
+        try {
+          await sock.sendMessage(chatId, { text: '✅ Unlinked. Restart the bot (npm start) to display a new QR and relink.' })
+        } catch {}
+        continue
+      }
 
       try {
         const payload = {
