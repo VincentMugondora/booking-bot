@@ -12,5 +12,6 @@ class Settings:
         self.JWT_SECRET = os.getenv("JWT_SECRET", "dev-secret")
         self.JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
         self.PORT = int(os.getenv("PORT", "8000"))
+        self.USE_LOCAL_LLM = os.getenv("USE_LOCAL_LLM", "false").lower() in ("1", "true", "yes")
 
 settings = Settings()

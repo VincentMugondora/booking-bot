@@ -14,6 +14,24 @@ SYSTEM_PROMPT = (
     "Extract service, location, and time; ask one clarifying question when needed."
 )
 
+def local_reply(text: str) -> str:
+    t = (text or "").lower()
+    intents = ["plumber", "cleaner", "electrician", "gardener", "painter"]
+    if any(w in t for w in intents):
+        need_loc = not any(w in t for w in [" near ", " location", " address", " in "])
+        need_time = not any(w in t for w in [" today", " tomorrow", " am", " pm", ":", " at "])
+        prompts = []
+        if need_loc:
+            prompts.append("your location")
+        if need_time:
+            prompts.append("preferred date/time")
+        if prompts:
+            if len(prompts) == 2:
+                return "Got it. Please share your location and preferred date/time."
+            return f"Got it. Please share {prompts[0]}."
+        return "Great. Any budget range I should consider before I suggest options?"
+    return "How can I help with booking today? Share the service, location, and preferred time."
+
 class ChatIn(BaseModel):
     session_id: str
     user_id: str
@@ -35,28 +53,30 @@ def chat(in_: ChatIn):
     )
 
     messages = [{"role": "user", "content": [{"text": in_.message}]}]
-    # Try configured model, then fall back to haiku and titan-lite for dev resilience
-    model_candidates = [
-        settings.BEDROCK_MODEL_ID,
-        "anthropic.claude-3-haiku-20240307",
-        "amazon.titan-text-lite-v1",
-    ]
-    reply = None
-    for mid in model_candidates:
-        try:
-            resp = converse(messages=messages, system_prompt=SYSTEM_PROMPT, model_id=mid)
-            reply = extract_text(resp)
-            if reply:
-                break
-        except ClientError as e:
-            logger.warning("Bedrock client error for model %s: %s", mid, e, exc_info=True)
-            continue
-        except Exception as e:
-            logger.exception("Unexpected Bedrock error for model %s: %s", mid, e)
-            continue
-    if not reply:
-        logger.error("All Bedrock model attempts failed: %s", model_candidates)
-        reply = "I'm having trouble reaching the AI right now. Please try again shortly."
+    if settings.USE_LOCAL_LLM:
+        reply = local_reply(in_.message)
+    else:
+        model_candidates = [
+            settings.BEDROCK_MODEL_ID,
+            "anthropic.claude-3-haiku-20240307",
+            "amazon.titan-text-lite-v1",
+        ]
+        reply = None
+        for mid in model_candidates:
+            try:
+                resp = converse(messages=messages, system_prompt=SYSTEM_PROMPT, model_id=mid)
+                reply = extract_text(resp)
+                if reply:
+                    break
+            except ClientError as e:
+                logger.warning("Bedrock client error for model %s: %s", mid, e, exc_info=True)
+                continue
+            except Exception as e:
+                logger.exception("Unexpected Bedrock error for model %s: %s", mid, e)
+                continue
+        if not reply:
+            logger.error("All Bedrock model attempts failed: %s", model_candidates)
+            reply = local_reply(in_.message)
 
     db.conversations.update_one(
         {"session_id": in_.session_id},
