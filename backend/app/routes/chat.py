@@ -5,6 +5,7 @@ from app.db.mongo_client import get_db
 from app.services.bedrock_client import converse, extract_text
 from app.config import settings
 from botocore.exceptions import ClientError
+from app.services.geocode import reverse_geocode
 
 router = APIRouter(prefix="/v1/chat", tags=["chat"])
 logger = logging.getLogger(__name__)
@@ -86,7 +87,8 @@ def chat(in_: ChatIn):
         # If a WhatsApp location attachment was sent, capture coordinates immediately
         has_coords = (getattr(in_, "lat", None) is not None and getattr(in_, "lng", None) is not None)
         if has_coords and not u.get("location"):
-            users.update_one({"_id": u["_id"]}, {"$set": {"coords": {"type": "Point", "coordinates": [in_.lng, in_.lat]}, "location": f"{in_.lat},{in_.lng}"}})
+            label = reverse_geocode(in_.lat, in_.lng) or f"{in_.lat},{in_.lng}"
+            users.update_one({"_id": u["_id"]}, {"$set": {"coords": {"type": "Point", "coordinates": [in_.lng, in_.lat]}, "location": label}})
             u = users.find_one({"_id": u["_id"]})
         # If we previously asked for a field, try to store the answer now
         pending = (u or {}).get("pending_field")
@@ -95,7 +97,8 @@ def chat(in_: ChatIn):
             u = users.find_one({"_id": u["_id"]})
         elif pending == "location" and (has_coords or in_.message.strip()):
             if has_coords:
-                users.update_one({"_id": u["_id"]}, {"$set": {"coords": {"type": "Point", "coordinates": [in_.lng, in_.lat]}, "location": f"{in_.lat},{in_.lng}"}, "$unset": {"pending_field": ""}})
+                label = reverse_geocode(in_.lat, in_.lng) or f"{in_.lat},{in_.lng}"
+                users.update_one({"_id": u["_id"]}, {"$set": {"coords": {"type": "Point", "coordinates": [in_.lng, in_.lat]}, "location": label}, "$unset": {"pending_field": ""}})
             else:
                 users.update_one({"_id": u["_id"]}, {"$set": {"location": in_.message.strip()}, "$unset": {"pending_field": ""}})
             u = users.find_one({"_id": u["_id"]})
@@ -174,12 +177,13 @@ def chat(in_: ChatIn):
         if p and pending_p == "service_type" and in_.message.strip():
             providers.update_one({"_id": p["_id"]}, {"$set": {"service_type": in_.message.strip()}, "${unset}": {}})
             providers.update_one({"_id": p["_id"]}, {"$set": {"pending_field": "coverage"}})
-            pr = "Where is your service located or what area do you cover? (send city/suburb or share current location)"
+            pr = f"Where is your service located or what area do you cover? (send city/suburb or share current location). Provider policy: {settings.PROVIDER_POLICY_URL}"
             db.conversations.update_one({"session_id": in_.session_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
             return ChatOut(reply=pr)
         if p and pending_p == "coverage" and (has_coords or in_.message.strip()):
             if has_coords:
-                providers.update_one({"_id": p["_id"]}, {"$set": {"coverage": f"{in_.lat},{in_.lng}", "coverage_coords": {"type": "Point", "coordinates": [in_.lng, in_.lat]}, "pending_field": "policy"}})
+                label = reverse_geocode(in_.lat, in_.lng) or f"{in_.lat},{in_.lng}"
+                providers.update_one({"_id": p["_id"]}, {"$set": {"coverage": label, "coverage_coords": {"type": "Point", "coordinates": [in_.lng, in_.lat]}, "pending_field": "policy"}})
             else:
                 providers.update_one({"_id": p["_id"]}, {"$set": {"coverage": in_.message.strip(), "pending_field": "policy"}})
             pr = "Do you agree to our service provider policy and terms? (yes/no)"
