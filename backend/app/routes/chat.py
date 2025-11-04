@@ -150,6 +150,72 @@ def chat(in_: ChatIn):
                 {"$push": {"messages": {"role": "assistant", "content": [{"text": reg_reply}]}}},
             )
             return ChatOut(reply=reg_reply)
+    # Provider onboarding flow (after user registration is complete)
+    if phone:
+        providers = db.providers
+        p = providers.find_one({"phone": phone})
+        lower_msg = (in_.message or "").strip().lower()
+        start_provider = ("register" in lower_msg and "provider" in lower_msg)
+        pending_p = (p or {}).get("pending_field") if p else None
+        has_coords = (getattr(in_, "lat", None) is not None and getattr(in_, "lng", None) is not None)
+
+        if start_provider and not p:
+            res = providers.insert_one({"phone": phone, "active": False, "policy_agreed": False, "pending_field": "name"})
+            p = providers.find_one({"_id": res.inserted_id})
+            pr = "Great! Let's get you registered as a service provider. What's your full name?"
+            db.conversations.update_one({"session_id": in_.session_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
+            return ChatOut(reply=pr)
+        if p and pending_p == "name" and in_.message.strip():
+            providers.update_one({"_id": p["_id"]}, {"$set": {"name": in_.message.strip(), "pending_field": "service_type"}})
+            pr = "Thanks! What type of service do you provide? (e.g., plumbing, electrical, cleaning)"
+            db.conversations.update_one({"session_id": in_.session_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
+            return ChatOut(reply=pr)
+        if p and pending_p == "service_type" and in_.message.strip():
+            providers.update_one({"_id": p["_id"]}, {"$set": {"service_type": in_.message.strip()}, "${unset}": {}})
+            providers.update_one({"_id": p["_id"]}, {"$set": {"pending_field": "coverage"}})
+            pr = "Where is your service located or what area do you cover? (send city/suburb or share current location)"
+            db.conversations.update_one({"session_id": in_.session_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
+            return ChatOut(reply=pr)
+        if p and pending_p == "coverage" and (has_coords or in_.message.strip()):
+            if has_coords:
+                providers.update_one({"_id": p["_id"]}, {"$set": {"coverage": f"{in_.lat},{in_.lng}", "coverage_coords": {"type": "Point", "coordinates": [in_.lng, in_.lat]}, "pending_field": "policy"}})
+            else:
+                providers.update_one({"_id": p["_id"]}, {"$set": {"coverage": in_.message.strip(), "pending_field": "policy"}})
+            pr = "Do you agree to our service provider policy and terms? (yes/no)"
+            db.conversations.update_one({"session_id": in_.session_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
+            return ChatOut(reply=pr)
+        if p and pending_p == "policy":
+            ans = lower_msg
+            if ans in ("yes", "y", "agree", "i agree"):
+                providers.update_one({"_id": p["_id"]}, {"$set": {"policy_agreed": True, "pending_field": "activate"}})
+                p = providers.find_one({"_id": p["_id"]})
+                prov_id = str(p["_id"]) if p else ""
+                pr = ("✅ Thank you! You're now registered as a service provider.\n"
+                      f"Provider Name: {p.get('name','')}\nService Type: {p.get('service_type','')}\nCoverage: {p.get('coverage','')}\nPolicy Agreed: Yes\nProvider ID: {prov_id}\n\n"
+                      "Would you like to go live and start receiving booking requests now? (yes/no)")
+                db.conversations.update_one({"session_id": in_.session_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
+                return ChatOut(reply=pr)
+            else:
+                pr = "You need to agree to the provider policy to continue. Do you agree? (yes/no)"
+                db.conversations.update_one({"session_id": in_.session_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
+                return ChatOut(reply=pr)
+        if p and pending_p == "activate":
+            if lower_msg in ("yes", "y"):
+                providers.update_one({"_id": p["_id"]}, {"$set": {"active": True}, "$unset": {"pending_field": ""}})
+                pr = "Fantastic! 🎉 You are now live as a provider. You'll receive booking requests here."
+                db.conversations.update_one({"session_id": in_.session_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
+                return ChatOut(reply=pr)
+            elif lower_msg in ("no", "n"):
+                providers.update_one({"_id": p["_id"]}, {"$set": {"active": False}, "$unset": {"pending_field": ""}})
+                pr = "No problem. You're registered but not live. Say 'go live' anytime to start receiving requests."
+                db.conversations.update_one({"session_id": in_.session_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
+                return ChatOut(reply=pr)
+            elif "go live" in lower_msg:
+                providers.update_one({"_id": p["_id"]}, {"$set": {"active": True}, "$unset": {"pending_field": ""}})
+                pr = "You're now live and ready to receive bookings!"
+                db.conversations.update_one({"session_id": in_.session_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
+                return ChatOut(reply=pr)
+
     fast_mode = bool(getattr(in_, "fast", False))
     max_tokens = 120 if fast_mode else 400
     temperature = 0.3 if fast_mode else 0.4
