@@ -743,7 +743,7 @@ def chat(in_: ChatIn):
                     dt_disp = dt_str
                 addr = merged.get("address") or {}
                 addr_str = ", ".join([p for p in [addr.get("street"), addr.get("suburb"), addr.get("city")] if p])
-                pr = f"Done! Booked {provider_name} for {dt_disp} at {addr_str}."
+                pr = f"Done! Booked {provider_name} for {dt_disp} at {addr_str}. CONFIRMED"
                 db.conversations.update_one({"session_id": conv_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
                 _print_msg(conv_id, phone, "assistant", pr)
                 return ChatOut(reply=pr)
@@ -773,16 +773,6 @@ def chat(in_: ChatIn):
                 score = len(msg_tokens & st_tokens)
                 if score > best_score or (score == best_score and cand and len(st) > len(cand)):
                     best_score = score
-            parts = [f"- {('what service' if fld=='service' else ('what you need done' if fld=='issue' else 'when'))}: {help_text.get(fld)}" for fld in missing]
-            extra = []
-            if (not merged.get("provider_id")) and merged.get("service"):
-                extra.append("I'll list nearby providers so you can pick a number or say 'recommend'.")
-            pr = "Here\u2019s what I need:\n" + "\n".join(parts)
-            if extra:
-                pr += "\n" + " ".join(extra)
-            db.conversations.update_one({"session_id": conv_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
-            _print_msg(conv_id, phone, "assistant", pr)
-            return ChatOut(reply=pr)
         # Friendly greeting handler
         if not merged.get("service") and any(g in lm for g in ("hi", "hello", "hey", "hie", "morning", "afternoon", "evening")):
             # Let the LLM craft a friendly greeting asking for service and preferred time in one sentence
