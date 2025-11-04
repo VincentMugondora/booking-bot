@@ -48,6 +48,7 @@ class ChatIn(BaseModel):
     message: str
     lat: float | None = None
     lng: float | None = None
+    fast: bool | None = False
 
 class ChatOut(BaseModel):
     reply: str
@@ -63,10 +64,17 @@ def chat(in_: ChatIn):
     )
 
     messages = [{"role": "user", "content": [{"text": in_.message}]}]
+    fast_mode = bool(getattr(in_, "fast", False))
+    max_tokens = 120 if fast_mode else 400
+    temperature = 0.3 if fast_mode else 0.4
+
     if settings.USE_LOCAL_LLM:
         reply = local_reply(in_.message)
     else:
-        _mc = _variants(settings.BEDROCK_MODEL_ID) + _variants("anthropic.claude-3-haiku-20240307")
+        if fast_mode:
+            _mc = _variants(settings.BEDROCK_FAST_MODEL_ID)
+        else:
+            _mc = _variants(settings.BEDROCK_MODEL_ID) + _variants("anthropic.claude-3-haiku-20240307")
         # de-duplicate while preserving order
         seen = set()
         model_candidates = []
@@ -75,10 +83,10 @@ def chat(in_: ChatIn):
                 model_candidates.append(m)
                 seen.add(m)
         reply = None
-        logger.info("Trying Bedrock model candidates: %s", model_candidates)
+        logger.info("Trying Bedrock model candidates: %s (fast=%s, max_tokens=%s)", model_candidates, fast_mode, max_tokens)
         for mid in model_candidates:
             try:
-                resp = converse(messages=messages, system_prompt=SYSTEM_PROMPT, model_id=mid)
+                resp = converse(messages=messages, system_prompt=SYSTEM_PROMPT, model_id=mid, max_tokens=max_tokens, temperature=temperature)
                 reply = extract_text(resp)
                 if reply:
                     break

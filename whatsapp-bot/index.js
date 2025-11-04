@@ -78,12 +78,16 @@ async function startBot() {
         const payload = {
           session_id: chatId,
           user_id: chatId,
-          message: text
+          message: text,
+          fast: true
         }
-        const res = await axios.post(`${BACKEND_URL}/v1/chat`, payload, {
-          timeout: 60000,
-          headers: { 'Content-Type': 'application/json' }
-        })
+        const axiosPromise = axios.post(`${BACKEND_URL}/v1/chat`, payload, { timeout: 60000, headers: { 'Content-Type': 'application/json' } })
+        let ackSent = false
+        await Promise.race([
+          axiosPromise,
+          (async () => { await new Promise(r => setTimeout(r, 1500)); ackSent = true; try { await sock.sendMessage(chatId, { text: '⏳ One sec…' }, { quoted: msg }) } catch {} })()
+        ])
+        const res = await axiosPromise
         const reply = res?.data?.reply || 'Sorry, I could not process that.'
         await sock.sendMessage(chatId, { text: reply }, { quoted: msg })
       } catch (err) {
