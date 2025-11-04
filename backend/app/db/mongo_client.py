@@ -18,8 +18,12 @@ def get_db():
 
 def init_indexes() -> None:
     db = get_db()
+    # legacy indexes
     db.providers.create_index([("location", GEOSPHERE)])
     db.providers.create_index([("services", ASCENDING)])
+    # active schema indexes
+    db.providers.create_index([("coverage_coords", GEOSPHERE)])
+    db.providers.create_index([("service_type", ASCENDING)])
     db.bookings.create_index([("provider_id", ASCENDING), ("start", ASCENDING)])
     db.conversations.create_index([("session_id", ASCENDING)], unique=True)
     db.users.create_index([("phone", ASCENDING)], unique=True)

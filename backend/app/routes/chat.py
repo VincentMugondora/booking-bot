@@ -135,6 +135,29 @@ def _extract_booking_entities(text: str, user_location: str | None) -> tuple[dic
     missing = [k for k in required if k not in result]
     return result, missing
 
+def _find_nearby_providers(db, service: str, u: dict | None, max_distance_m: int = 30000) -> list[dict]:
+    if not service:
+        return []
+    coords = None
+    if u:
+        c = (u or {}).get("coords") or {}
+        if isinstance(c, dict):
+            coords = c.get("coordinates")
+    query = {"active": True, "service_type": service}
+    if isinstance(coords, list) and len(coords) == 2:
+        lng, lat = coords[0], coords[1]
+        query["coverage_coords"] = {
+            "$near": {
+                "$geometry": {"type": "Point", "coordinates": [lng, lat]},
+                "$maxDistance": max_distance_m,
+            }
+        }
+        cur = db.providers.find(query).limit(5)
+        return list(cur)
+    # Fallback: no coords; return top few active providers of that service
+    cur = db.providers.find({"active": True, "service_type": service}).limit(5)
+    return list(cur)
+
 def _print_msg(conv_id: str, phone: str | None, role: str, text: str) -> None:
     try:
         ts = datetime.utcnow().isoformat()
