@@ -6,8 +6,9 @@ from app.services.bedrock_client import converse, extract_text
 from app.config import settings
 from botocore.exceptions import ClientError
 from app.services.geocode import reverse_geocode
-from datetime import datetime
+from datetime import datetime, timedelta
 import uuid
+import re
 
 router = APIRouter(prefix="/v1/chat", tags=["chat"])
 logger = logging.getLogger(__name__)
@@ -20,11 +21,11 @@ SYSTEM_PROMPT = (
     "When collecting registration info, ask one question at a time and keep it short."
 )
 
-def local_reply(text: str) -> str:
+def local_reply(text: str, has_location: bool = False) -> str:
     t = (text or "").lower()
     intents = ["plumber", "cleaner", "electrician", "gardener", "painter"]
     if any(w in t for w in intents):
-        need_loc = not any(w in t for w in [" near ", " location", " address", " in "])
+        need_loc = (not has_location) and not any(w in t for w in [" near ", " location", " address", " in "])
         need_time = not any(w in t for w in [" today", " tomorrow", " am", " pm", ":", " at "])
         prompts = []
         if need_loc:
@@ -57,10 +58,89 @@ def _extract_phone(s: str | None) -> str | None:
     v = "".join(ch for ch in v if (ch.isdigit() or ch == "+"))
     return v if any(c.isdigit() for c in v) else None
 
+def _parse_natural_datetime(text: str) -> datetime | None:
+    t = (text or "").lower()
+    base = None
+    now = datetime.utcnow()
+    if "tomorrow" in t:
+        base = now + timedelta(days=1)
+    elif "today" in t:
+        base = now
+    # try hh:mm(am/pm)
+    hour = None
+    minute = 0
+    ampm = None
+    m = re.search(r"\b(\d{1,2}):(\d{2})\s*(am|pm)?\b", t)
+    if m:
+        hour = int(m.group(1)); minute = int(m.group(2)); ampm = m.group(3)
+    else:
+        # 300pm, 1230pm etc
+        m = re.search(r"\b(\d{3,4})\s*(am|pm)\b", t)
+        if m:
+            num = m.group(1); ampm = m.group(2)
+            if len(num) == 3:
+                hour = int(num[0]); minute = int(num[1:])
+            else:
+                hour = int(num[:-2]); minute = int(num[-2:])
+        else:
+            # 3 pm or 3pm
+            m = re.search(r"\b(\d{1,2})\s*(am|pm)\b", t)
+            if m:
+                hour = int(m.group(1)); minute = 0; ampm = m.group(2)
+    if hour is None:
+        return None
+    if ampm:
+        if ampm == "pm" and hour != 12:
+            hour += 12
+        if ampm == "am" and hour == 12:
+            hour = 0
+    if not base:
+        return None
+    return base.replace(hour=hour, minute=minute, second=0, microsecond=0)
+
+def _extract_booking_entities(text: str, user_location: str | None) -> tuple[dict, list[str]]:
+    t = text or ""
+    tl = t.lower()
+    services = ["plumber", "electrician", "cleaner", "painter", "gardener", "handyman"]
+    service = next((s for s in services if s in tl), None)
+    dt = _parse_natural_datetime(tl)
+    issue = None
+    m = re.search(r"\bfor\s+(.+?)(?:\s+at\b|\s+on\b|$)", tl)
+    if m:
+        issue = m.group(1).strip()
+    else:
+        m = re.search(r"(leak\w.*|broken[^.]*|not working[^.]*|clog\w[^.]*)", tl)
+        if m:
+            issue = m.group(1).strip()
+    address = None
+    m = re.search(r"(\d+\s+[A-Za-z][\w\s\-]*)[, ]+([A-Za-z][\w\-]+)[, ]+([A-Za-z][\w\-]+)", t)
+    if m:
+        address = {"street": m.group(1).strip(), "suburb": m.group(2).strip(), "city": m.group(3).strip()}
+    elif user_location:
+        parts = [p.strip() for p in user_location.split(',') if p.strip()]
+        if len(parts) >= 2:
+            address = {"street": None, "suburb": parts[-2], "city": parts[-1]}
+        elif len(parts) == 1:
+            address = {"street": None, "suburb": None, "city": parts[0]}
+    result: dict = {}
+    if service:
+        result["service"] = service
+    if issue:
+        result["issue"] = issue
+    if dt:
+        result["date_time"] = dt.isoformat()
+    if address:
+        result["address"] = address
+    required = ["service", "issue", "date_time", "address"]
+    missing = [k for k in required if k not in result]
+    return result, missing
+
 def _print_msg(conv_id: str, phone: str | None, role: str, text: str) -> None:
     try:
         ts = datetime.utcnow().isoformat()
-        print(f"{ts} Hustlr [{phone}|{conv_id}] {role.upper()}: {text}")
+        line = f"{ts} Hustlr [{phone}|{conv_id}] {role.upper()}: {text}"
+        print(line)
+        logging.getLogger(__name__).info(line)
     except Exception:
         pass
 
@@ -135,6 +215,7 @@ def chat(in_: ChatIn):
     _print_msg(conv_id, phone, "user", in_.message or "")
 
     messages = [{"role": "user", "content": [{"text": in_.message}]}]
+    user_location = None
     if phone:
         users = db.users
         u = users.find_one({"phone": phone})
@@ -148,6 +229,14 @@ def chat(in_: ChatIn):
             label = reverse_geocode(in_.lat, in_.lng) or f"{in_.lat},{in_.lng}"
             users.update_one({"_id": u["_id"]}, {"$set": {"coords": {"type": "Point", "coordinates": [in_.lng, in_.lat]}, "location": label}})
             u = users.find_one({"_id": u["_id"]})
+        elif (not has_coords) and (not u.get("location")):
+            c = (u or {}).get("coords") or {}
+            coords = c.get("coordinates") if isinstance(c, dict) else None
+            if isinstance(coords, list) and len(coords) == 2:
+                lng, lat = coords[0], coords[1]
+                label = reverse_geocode(lat, lng) or f"{lat},{lng}"
+                users.update_one({"_id": u["_id"]}, {"$set": {"location": label}})
+                u = users.find_one({"_id": u["_id"]})
         # If we previously asked for a field, try to store the answer now
         pending = (u or {}).get("pending_field")
         if pending == "name" and in_.message.strip():
@@ -170,6 +259,7 @@ def chat(in_: ChatIn):
                 _log_and_close(db, conv_id, phone)
                 return ChatOut(reply=reg_done)
             u = users.find_one({"_id": u["_id"]})
+        user_location = (u or {}).get("location")
 
         # Commands
         if lower_msg.startswith('/'):
@@ -250,7 +340,7 @@ def chat(in_: ChatIn):
         missing: list[str] = []
         if not u.get("name"):
             missing.append("name")
-        if not u.get("location"):
+        if not (u.get("location") or u.get("coords")):
             missing.append("location")
         if not u.get("policy_agreed", False):
             missing.append("policy")
@@ -369,12 +459,85 @@ def chat(in_: ChatIn):
                 _log_and_close(db, conv_id, phone)
                 return ChatOut(reply=pr)
 
+    # Booking extraction and confirmation flow
+    if phone:
+        conv_doc = db.conversations.find_one({"session_id": conv_id}) or {}
+        draft = conv_doc.get("booking_draft") or {}
+        bstate = conv_doc.get("booking_state")
+        lm = (in_.message or "").strip().lower()
+        confirm_words = ("yes", "y", "confirm", "ok", "okay", "go ahead", "sure")
+
+        if bstate == "awaiting_confirm":
+            if any((lm == w) or lm.startswith(w) for w in confirm_words):
+                merged = draft or {}
+                if ("address" not in merged or not merged.get("address")) and user_location:
+                    parts = [p.strip() for p in user_location.split(",") if p.strip()]
+                    addr = {"street": None, "suburb": parts[-2] if len(parts) >= 2 else None, "city": parts[-1] if parts else None}
+                    merged["address"] = addr
+                book = {
+                    "user_id": phone,
+                    "service": merged.get("service"),
+                    "issue": merged.get("issue"),
+                    "date_time": merged.get("date_time"),
+                    "address": merged.get("address"),
+                    "status": "confirmed",
+                    "created_at": datetime.utcnow().isoformat(),
+                }
+                db.booking_requests.insert_one(book)
+                db.conversations.update_one({"session_id": conv_id}, {"$unset": {"booking_draft": "", "booking_state": ""}})
+                dt_str = merged.get("date_time")
+                try:
+                    dt_disp = datetime.fromisoformat(dt_str).strftime('%Y-%m-%d %I:%M %p') if dt_str else dt_str
+                except Exception:
+                    dt_disp = dt_str
+                addr = merged.get("address") or {}
+                addr_str = ", ".join([p for p in [addr.get("street"), addr.get("suburb"), addr.get("city")] if p])
+                pr = f"Done! Your {merged.get('service','service')} is booked for {dt_disp} at {addr_str}."
+                db.conversations.update_one({"session_id": conv_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
+                _print_msg(conv_id, phone, "assistant", pr)
+                return ChatOut(reply=pr)
+            elif lm in ("no", "n", "cancel", "stop"):
+                db.conversations.update_one({"session_id": conv_id}, {"$unset": {"booking_draft": "", "booking_state": ""}})
+                pr = "Okay, cancelled the booking."
+                db.conversations.update_one({"session_id": conv_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
+                _print_msg(conv_id, phone, "assistant", pr)
+                return ChatOut(reply=pr)
+
+        extracted, _ = _extract_booking_entities(in_.message, user_location)
+        merged = dict(draft)
+        for k, v in (extracted or {}).items():
+            if v and (k not in merged or not merged.get(k)):
+                merged[k] = v
+        required = ["service", "issue", "date_time", "address"]
+        missing = [k for k in required if not merged.get(k)]
+        if merged and merged != draft:
+            db.conversations.update_one({"session_id": conv_id}, {"$set": {"booking_draft": merged, "booking_state": "collecting"}})
+        if merged and not missing:
+            addr = merged.get("address") or {}
+            addr_str = ", ".join([p for p in [addr.get("street"), addr.get("suburb"), addr.get("city")] if p])
+            dt_str = merged.get("date_time")
+            try:
+                dt_disp = datetime.fromisoformat(dt_str).strftime('%Y-%m-%d %I:%M %p') if dt_str else dt_str
+            except Exception:
+                dt_disp = dt_str
+            pr = f"Got it! Booking a {merged.get('service')} for '{merged.get('issue')}' on {dt_disp} at {addr_str}. Confirm?"
+            db.conversations.update_one({"session_id": conv_id}, {"$set": {"booking_state": "awaiting_confirm"}})
+            db.conversations.update_one({"session_id": conv_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
+            _print_msg(conv_id, phone, "assistant", pr)
+            return ChatOut(reply=pr)
+        elif extracted and missing:
+            pr = "Could you provide the following info: " + ", ".join(missing) + "?"
+            db.conversations.update_one({"session_id": conv_id}, {"$set": {"booking_draft": merged, "booking_state": "collecting"}})
+            db.conversations.update_one({"session_id": conv_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
+            _print_msg(conv_id, phone, "assistant", pr)
+            return ChatOut(reply=pr)
+
     fast_mode = bool(getattr(in_, "fast", False))
     max_tokens = 120 if fast_mode else 400
     temperature = 0.3 if fast_mode else 0.4
 
     if settings.USE_LOCAL_LLM:
-        reply = local_reply(in_.message)
+        reply = local_reply(in_.message, has_location=bool(user_location))
     else:
         if fast_mode:
             _mc = _variants(settings.BEDROCK_FAST_MODEL_ID)
@@ -389,9 +552,12 @@ def chat(in_: ChatIn):
                 seen.add(m)
         reply = None
         logger.info("Trying Bedrock model candidates: %s (fast=%s, max_tokens=%s)", model_candidates, fast_mode, max_tokens)
+        llm_messages = messages
+        if user_location:
+            llm_messages = [{"role": "user", "content": [{"text": f"[Context] User location: {user_location}"}]}] + messages
         for mid in model_candidates:
             try:
-                resp = converse(messages=messages, system_prompt=SYSTEM_PROMPT, model_id=mid, max_tokens=max_tokens, temperature=temperature)
+                resp = converse(messages=llm_messages, system_prompt=SYSTEM_PROMPT, model_id=mid, max_tokens=max_tokens, temperature=temperature)
                 reply = extract_text(resp)
                 if reply:
                     break
@@ -403,7 +569,7 @@ def chat(in_: ChatIn):
                 continue
         if not reply:
             logger.error("All Bedrock model attempts failed: %s", model_candidates)
-            reply = local_reply(in_.message)
+            reply = local_reply(in_.message, has_location=bool(user_location))
 
     db.conversations.update_one(
         {"session_id": conv_id},
