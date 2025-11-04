@@ -86,6 +86,7 @@ def chat(in_: ChatIn):
             u = users.find_one({"phone": phone})
         # If a WhatsApp location attachment was sent, capture coordinates immediately
         has_coords = (getattr(in_, "lat", None) is not None and getattr(in_, "lng", None) is not None)
+        lower_msg = (in_.message or "").strip().lower()
         if has_coords and not u.get("location"):
             label = reverse_geocode(in_.lat, in_.lng) or f"{in_.lat},{in_.lng}"
             users.update_one({"_id": u["_id"]}, {"$set": {"coords": {"type": "Point", "coordinates": [in_.lng, in_.lat]}, "location": label}})
@@ -107,6 +108,70 @@ def chat(in_: ChatIn):
             if ans in ("yes", "y", "agree", "i agree"):
                 users.update_one({"_id": u["_id"]}, {"$set": {"policy_agreed": True}, "$unset": {"pending_field": ""}})
             u = users.find_one({"_id": u["_id"]})
+
+        # Commands
+        if lower_msg.startswith('/'):
+            cmd = lower_msg.split()[0]
+            # /reset: reset user profile and pending flows
+            if cmd == '/reset':
+                users.update_one({"_id": u["_id"]}, {
+                    "$set": {"name": None, "location": None, "policy_agreed": False},
+                    "$unset": {"pending_field": "", "coords": ""}
+                })
+                db.providers.update_one({"phone": phone}, {"$unset": {"pending_field": ""}}, upsert=False)
+                pr = "Your profile has been reset. Let's start over — what's your full name?"
+                db.conversations.update_one({"session_id": in_.session_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
+                return ChatOut(reply=pr)
+            # /profile: show user profile
+            if cmd == '/profile':
+                u = users.find_one({"phone": phone}) or {}
+                pr = (f"Profile\n"
+                      f"Name: {u.get('name') or '-'}\n"
+                      f"Location: {u.get('location') or '-'}\n"
+                      f"Policy agreed: {'Yes' if u.get('policy_agreed') else 'No'}\n"
+                      f"Phone: {phone}")
+                db.conversations.update_one({"session_id": in_.session_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
+                return ChatOut(reply=pr)
+            # /provider status: show provider record
+            if lower_msg.startswith('/provider status'):
+                pdoc = db.providers.find_one({"phone": phone}) or {}
+                if not pdoc:
+                    pr = "No provider profile found. Say 'register as a provider' to start."
+                else:
+                    pr = ("Provider Status\n"
+                          f"Name: {pdoc.get('name','-')}\nService: {pdoc.get('service_type','-')}\n"
+                          f"Coverage: {pdoc.get('coverage','-')}\nActive: {'Yes' if pdoc.get('active') else 'No'}\n"
+                          f"Policy agreed: {'Yes' if pdoc.get('policy_agreed') else 'No'}\n"
+                          f"Provider ID: {str(pdoc.get('_id'))}")
+                db.conversations.update_one({"session_id": in_.session_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
+                return ChatOut(reply=pr)
+            # /bookings: list next 5 bookings
+            if cmd == '/bookings':
+                items = []
+                # as user (by phone)
+                for b in db.bookings.find({"user_id": phone}).sort("start", 1).limit(5):
+                    items.append({"role": "user", "start": b.get("start"), "end": b.get("end"), "provider_id": b.get("provider_id")})
+                # as provider (by provider _id)
+                pdoc = db.providers.find_one({"phone": phone})
+                if pdoc:
+                    pid = str(pdoc.get("_id"))
+                    for b in db.bookings.find({"provider_id": pid}).sort("start", 1).limit(5):
+                        items.append({"role": "provider", "start": b.get("start"), "end": b.get("end"), "user_id": b.get("user_id")})
+                if not items:
+                    pr = "No upcoming bookings found."
+                else:
+                    lines = ["Upcoming bookings:"]
+                    for it in items[:5]:
+                        s = it.get("start"); e = it.get("end")
+                        siso = s.isoformat() if hasattr(s, 'isoformat') else str(s)
+                        eiso = e.isoformat() if hasattr(e, 'isoformat') else str(e)
+                        if it.get("role") == 'user':
+                            lines.append(f"You booked provider {it.get('provider_id')} from {siso} to {eiso}")
+                        else:
+                            lines.append(f"Client {it.get('user_id')} from {siso} to {eiso}")
+                    pr = "\n".join(lines)
+                db.conversations.update_one({"session_id": in_.session_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
+                return ChatOut(reply=pr)
 
         # Compute missing fields
         missing: list[str] = []
