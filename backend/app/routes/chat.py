@@ -194,6 +194,9 @@ def _find_nearby_providers(db, service: str, u: dict | None, desired_start: date
             {"$limit": 10},
         ]
         results = list(db.providers.aggregate(pipeline))
+        if not results:
+            # fallback to non-geo active list if no nearby results
+            results = list(db.providers.find(qry).limit(10))
     else:
         # no coords — basic list
         results = list(db.providers.find(qry).limit(10))
