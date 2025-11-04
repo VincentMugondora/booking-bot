@@ -635,15 +635,40 @@ def chat(in_: ChatIn):
         # If service identified but no provider chosen, list nearby options
         if merged.get("service") and not merged.get("provider_id") and not prov_opts:
             u_doc = db.users.find_one({"phone": phone}) or None
-            provs = _find_nearby_providers(db, merged.get("service"), u_doc)
+            # derive desired start if available to evaluate availability/ETA ranking
+            desired_start = None
+            try:
+                if merged.get("date_time"):
+                    desired_start = datetime.fromisoformat(merged.get("date_time"))
+            except Exception:
+                desired_start = None
+            provs = _find_nearby_providers(db, merged.get("service"), u_doc, desired_start=desired_start)
             if provs:
                 lines = ["Here are nearby " + merged.get("service") + "s:"]
                 opts = []
                 for i, pv in enumerate(provs[:5], start=1):
                     nm = pv.get("name") or "Provider"
                     area = pv.get("coverage") or pv.get("coverage_label") or pv.get("service_type")
-                    lines.append(f"{i}. {nm} — {area}")
-                    opts.append({"_id": pv.get("_id"), "name": nm, "coverage": area})
+                    dist_m = pv.get("distance_m") if isinstance(pv.get("distance_m"), (int, float)) else None
+                    dist_str = f"{dist_m/1000:.1f} km" if dist_m else None
+                    eta = pv.get("eta_min")
+                    eta_str = f"~{eta} min" if isinstance(eta, int) else None
+                    rating = pv.get("rating")
+                    rating_str = f"★{float(rating):.1f}" if isinstance(rating, (int, float)) and rating > 0 else None
+                    avail = pv.get("available")
+                    avail_str = "Available" if avail else ("Busy" if avail is not None else None)
+                    parts = [p for p in [area, dist_str, eta_str, rating_str, avail_str] if p]
+                    meta = " • ".join(parts) if parts else area
+                    lines.append(f"{i}. {nm} — {meta}")
+                    opts.append({
+                        "_id": pv.get("_id"),
+                        "name": nm,
+                        "coverage": area,
+                        "distance_m": dist_m,
+                        "eta_min": eta if isinstance(eta, int) else None,
+                        "rating": float(rating) if isinstance(rating, (int, float)) else None,
+                        "available": bool(avail) if isinstance(avail, bool) else avail,
+                    })
                 lines.append("Reply with 1-" + str(len(opts)) + " to choose, or say 'recommend'.")
                 pr = "\n".join(lines)
                 db.conversations.update_one({"session_id": conv_id}, {"$set": {"provider_options": opts, "booking_draft": merged, "booking_state": "awaiting_provider_choice"}})
