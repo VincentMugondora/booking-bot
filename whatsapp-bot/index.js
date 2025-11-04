@@ -18,6 +18,24 @@ function extractText(msg) {
   return ''
 }
 
+function extractLocation(msg) {
+  const raw = msg.message || {}
+  const loc = raw.locationMessage
+    || raw.liveLocationMessage
+    || raw.ephemeralMessage?.message?.locationMessage
+    || raw.ephemeralMessage?.message?.liveLocationMessage
+  if (!loc) return null
+  const lat = (loc.degreesLatitude ?? loc.latitude)
+  const lng = (loc.degreesLongitude ?? loc.longitude)
+  if (typeof lat !== 'number' || typeof lng !== 'number') return null
+  return {
+    lat,
+    lng,
+    name: loc.name || loc.comment || undefined,
+    address: loc.address || undefined,
+  }
+}
+
 async function startBot() {
   const { state, saveCreds } = await useMultiFileAuthState(SESSION_DIR)
   const { version } = await fetchLatestBaileysVersion()
@@ -57,7 +75,8 @@ async function startBot() {
       // Ignore group chats
       if (chatId.endsWith('@g.us')) continue
       const text = extractText(msg).trim()
-      if (!text) continue
+      const location = extractLocation(msg)
+      if (!text && !location) continue
 
       // Special command: /unlink — logout & clear session directory
       if (text === '/unlink') {
@@ -78,16 +97,14 @@ async function startBot() {
         const payload = {
           session_id: chatId,
           user_id: chatId,
-          message: text,
+          message: text || (location ? '[location]' : ''),
           fast: true
         }
-        const axiosPromise = axios.post(`${BACKEND_URL}/v1/chat`, payload, { timeout: 60000, headers: { 'Content-Type': 'application/json' } })
-        let ackSent = false
-        await Promise.race([
-          axiosPromise,
-          (async () => { await new Promise(r => setTimeout(r, 1500)); ackSent = true; try { await sock.sendMessage(chatId, { text: '⏳ One sec…' }, { quoted: msg }) } catch {} })()
-        ])
-        const res = await axiosPromise
+        if (location) {
+          payload.lat = location.lat
+          payload.lng = location.lng
+        }
+        const res = await axios.post(`${BACKEND_URL}/v1/chat`, payload, { timeout: 60000, headers: { 'Content-Type': 'application/json' } })
         const reply = res?.data?.reply || 'Sorry, I could not process that.'
         await sock.sendMessage(chatId, { text: reply }, { quoted: msg })
       } catch (err) {

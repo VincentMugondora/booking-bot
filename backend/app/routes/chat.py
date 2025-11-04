@@ -80,13 +80,21 @@ def chat(in_: ChatIn):
         if not u:
             users.insert_one({"phone": phone, "policy_agreed": False})
             u = users.find_one({"phone": phone})
+        # If a WhatsApp location attachment was sent, capture coordinates immediately
+        has_coords = (getattr(in_, "lat", None) is not None and getattr(in_, "lng", None) is not None)
+        if has_coords and not u.get("location"):
+            users.update_one({"_id": u["_id"]}, {"$set": {"coords": {"type": "Point", "coordinates": [in_.lng, in_.lat]}, "location": f"{in_.lat},{in_.lng}"}})
+            u = users.find_one({"_id": u["_id"]})
         # If we previously asked for a field, try to store the answer now
         pending = (u or {}).get("pending_field")
         if pending == "name" and in_.message.strip():
             users.update_one({"_id": u["_id"]}, {"$set": {"name": in_.message.strip()}, "$unset": {"pending_field": ""}})
             u = users.find_one({"_id": u["_id"]})
-        elif pending == "location" and in_.message.strip():
-            users.update_one({"_id": u["_id"]}, {"$set": {"location": in_.message.strip()}, "$unset": {"pending_field": ""}})
+        elif pending == "location" and (has_coords or in_.message.strip()):
+            if has_coords:
+                users.update_one({"_id": u["_id"]}, {"$set": {"coords": {"type": "Point", "coordinates": [in_.lng, in_.lat]}, "location": f"{in_.lat},{in_.lng}"}, "$unset": {"pending_field": ""}})
+            else:
+                users.update_one({"_id": u["_id"]}, {"$set": {"location": in_.message.strip()}, "$unset": {"pending_field": ""}})
             u = users.find_one({"_id": u["_id"]})
         elif pending == "policy":
             ans = (in_.message or "").strip().lower()
