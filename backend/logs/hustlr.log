@@ -283,3 +283,5 @@ ASSISTANT: No problem. You're registered but not live. Say 'go live' anytime to 
 2025-11-04 15:13:17,970 INFO app.routes.chat: 2025-11-04T13:13:17.970432 Hustlr [263777530322|a2486c80-47e1-437a-b75c-e2907c7b4e6d] USER: Cancel
 2025-11-04 15:13:18,516 INFO app.routes.chat: 2025-11-04T13:13:18.515648 Hustlr [263777530322|a2486c80-47e1-437a-b75c-e2907c7b4e6d] ASSISTANT: Here’s what I need:
 
+2025-11-04 15:25:20,135 INFO app.routes.chat: 2025-11-04T13:25:20.135089 Hustlr [120363373158507098|1f06cde8-2b32-4f44-87f6-964764f1873b] USER: Mhanyai muone video raiswa yohwe🥵📺👆👆🇿🇼
+2025-11-04 15:25:23,045 INFO app.routes.chat: 2025-11-04T13:25:23.045179 Hustlr [120363373158507098|1f06cde8-2b32-4f44-87f6-964764f1873b] ASSISTANT: What is your location?
