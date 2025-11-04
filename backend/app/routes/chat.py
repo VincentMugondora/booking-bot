@@ -487,8 +487,48 @@ def chat(in_: ChatIn):
         conv_doc = db.conversations.find_one({"session_id": conv_id}) or {}
         draft = conv_doc.get("booking_draft") or {}
         bstate = conv_doc.get("booking_state")
+        prov_opts = conv_doc.get("provider_options") or []
         lm = (in_.message or "").strip().lower()
         confirm_words = ("yes", "y", "confirm", "ok", "okay", "go ahead", "sure")
+
+        # Provider selection handling (before confirmation)
+        if (bstate == "awaiting_provider_choice" or (prov_opts and not draft.get("provider_id"))):
+            chosen = None
+            if "recommend" in lm or "choose for me" in lm or "pick for me" in lm:
+                chosen = prov_opts[0] if prov_opts else None
+            else:
+                m_sel = re.search(r"\b([1-9])\b", lm)
+                if m_sel:
+                    idx = int(m_sel.group(1)) - 1
+                    if 0 <= idx < len(prov_opts):
+                        chosen = prov_opts[idx]
+            if chosen:
+                merged = dict(draft)
+                merged["provider_id"] = str(chosen.get("_id"))
+                merged["provider_name"] = chosen.get("name") or "Provider"
+                db.conversations.update_one({"session_id": conv_id}, {"$set": {"booking_draft": merged}, "$unset": {"provider_options": ""}})
+                # Now decide next prompt
+                required = ["service", "issue", "date_time", "address", "provider_id"]
+                missing = [k for k in required if not merged.get(k)]
+                if not missing:
+                    addr = merged.get("address") or {}
+                    addr_str = ", ".join([p for p in [addr.get("street"), addr.get("suburb"), addr.get("city")] if p])
+                    dt_str = merged.get("date_time")
+                    try:
+                        dt_disp = datetime.fromisoformat(dt_str).strftime('%Y-%m-%d %I:%M %p') if dt_str else dt_str
+                    except Exception:
+                        dt_disp = dt_str
+                    pr = f"Got it! Booking {merged.get('provider_name')} for '{merged.get('issue')}' on {dt_disp} at {addr_str}. Confirm?"
+                    db.conversations.update_one({"session_id": conv_id}, {"$set": {"booking_state": "awaiting_confirm"}})
+                    db.conversations.update_one({"session_id": conv_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
+                    _print_msg(conv_id, phone, "assistant", pr)
+                    return ChatOut(reply=pr)
+                else:
+                    pr = "Great, I selected " + (merged.get("provider_name") or "a provider") + ". Could you provide: " + ", ".join(missing) + "?"
+                    db.conversations.update_one({"session_id": conv_id}, {"$set": {"booking_draft": merged, "booking_state": "collecting"}})
+                    db.conversations.update_one({"session_id": conv_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
+                    _print_msg(conv_id, phone, "assistant", pr)
+                    return ChatOut(reply=pr)
 
         if bstate == "awaiting_confirm":
             if any((lm == w) or lm.startswith(w) for w in confirm_words):
@@ -503,6 +543,8 @@ def chat(in_: ChatIn):
                     "issue": merged.get("issue"),
                     "date_time": merged.get("date_time"),
                     "address": merged.get("address"),
+                    "provider_id": merged.get("provider_id"),
+                    "provider_name": merged.get("provider_name"),
                     "status": "confirmed",
                     "created_at": datetime.utcnow().isoformat(),
                 }
@@ -531,8 +573,26 @@ def chat(in_: ChatIn):
         for k, v in (extracted or {}).items():
             if v and (k not in merged or not merged.get(k)):
                 merged[k] = v
-        required = ["service", "issue", "date_time", "address"]
+        required = ["service", "issue", "date_time", "address", "provider_id"]
         missing = [k for k in required if not merged.get(k)]
+        # If service identified but no provider chosen, list nearby options
+        if merged.get("service") and not merged.get("provider_id") and not prov_opts:
+            u_doc = db.users.find_one({"phone": phone}) or None
+            provs = _find_nearby_providers(db, merged.get("service"), u_doc)
+            if provs:
+                lines = ["Here are nearby " + merged.get("service") + "s:"]
+                opts = []
+                for i, pv in enumerate(provs[:5], start=1):
+                    nm = pv.get("name") or "Provider"
+                    area = pv.get("coverage") or pv.get("coverage_label") or pv.get("service_type")
+                    lines.append(f"{i}. {nm} — {area}")
+                    opts.append({"_id": pv.get("_id"), "name": nm, "coverage": area})
+                lines.append("Reply with 1-" + str(len(opts)) + " to choose, or say 'recommend'.")
+                pr = "\n".join(lines)
+                db.conversations.update_one({"session_id": conv_id}, {"$set": {"provider_options": opts, "booking_draft": merged, "booking_state": "awaiting_provider_choice"}})
+                db.conversations.update_one({"session_id": conv_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
+                _print_msg(conv_id, phone, "assistant", pr)
+                return ChatOut(reply=pr)
         if merged and merged != draft:
             db.conversations.update_one({"session_id": conv_id}, {"$set": {"booking_draft": merged, "booking_state": "collecting"}})
         if merged and not missing:
@@ -543,7 +603,8 @@ def chat(in_: ChatIn):
                 dt_disp = datetime.fromisoformat(dt_str).strftime('%Y-%m-%d %I:%M %p') if dt_str else dt_str
             except Exception:
                 dt_disp = dt_str
-            pr = f"Got it! Booking a {merged.get('service')} for '{merged.get('issue')}' on {dt_disp} at {addr_str}. Confirm?"
+            prov_name = merged.get("provider_name") or "a provider"
+            pr = f"Got it! Booking {prov_name} for '{merged.get('issue')}' on {dt_disp} at {addr_str}. Confirm?"
             db.conversations.update_one({"session_id": conv_id}, {"$set": {"booking_state": "awaiting_confirm"}})
             db.conversations.update_one({"session_id": conv_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
             _print_msg(conv_id, phone, "assistant", pr)
