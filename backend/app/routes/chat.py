@@ -773,6 +773,9 @@ def chat(in_: ChatIn):
                 score = len(msg_tokens & st_tokens)
                 if score > best_score or (score == best_score and cand and len(st) > len(cand)):
                     best_score = score
+                    cand = st
+            if best_score > 0 and cand:
+                merged["service"] = cand
         # Friendly greeting handler
         if not merged.get("service") and any(g in lm for g in ("hi", "hello", "hey", "hie", "morning", "afternoon", "evening")):
             # Let the LLM craft a friendly greeting asking for service and preferred time in one sentence
