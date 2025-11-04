@@ -74,7 +74,10 @@ def _log_and_close(db, conv_id: str, phone: str | None) -> None:
             if isinstance(c, dict) and "text" in c:
                 texts.append(c.get("text", ""))
         lines.append(f"{role.upper()}: {' '.join(texts).strip()}")
-    logging.getLogger(__name__).info("\n".join(lines))
+    transcript = "\n".join(lines)
+    # Print to terminal and also log, to guarantee visibility
+    print(transcript)
+    logging.getLogger(__name__).info(transcript)
     db.conversations.update_one(
         {"session_id": conv_id},
         {"$set": {"status": "closed", "ended_at": datetime.utcnow().isoformat()}},
@@ -153,6 +156,11 @@ def chat(in_: ChatIn):
             ans = (in_.message or "").strip().lower()
             if ans in ("yes", "y", "agree", "i agree"):
                 users.update_one({"_id": u["_id"]}, {"$set": {"policy_agreed": True}, "$unset": {"pending_field": ""}})
+                # Auto-close registration conversation with a friendly message
+                reg_done = "✅ Thank you! Your registration is now complete. How can I assist you today?"
+                db.conversations.update_one({"session_id": conv_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": reg_done}]}}})
+                _log_and_close(db, conv_id, phone)
+                return ChatOut(reply=reg_done)
             u = users.find_one({"_id": u["_id"]})
 
         # Commands
@@ -182,7 +190,7 @@ def chat(in_: ChatIn):
                       f"Location: {u.get('location') or '-'}\n"
                       f"Policy agreed: {'Yes' if u.get('policy_agreed') else 'No'}\n"
                       f"Phone: {phone}")
-                db.conversations.update_one({"session_id": in_.session_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
+                db.conversations.update_one({"session_id": conv_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
                 return ChatOut(reply=pr)
             # /provider status: show provider record
             if lower_msg.startswith('/provider status'):
@@ -295,7 +303,7 @@ def chat(in_: ChatIn):
             providers.update_one({"_id": p["_id"]}, {"$set": {"service_type": in_.message.strip()}, "${unset}": {}})
             providers.update_one({"_id": p["_id"]}, {"$set": {"pending_field": "coverage"}})
             pr = f"Where is your service located or what area do you cover? (send city/suburb or share current location). Provider policy: {settings.PROVIDER_POLICY_URL}"
-            db.conversations.update_one({"session_id": in_.session_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
+            db.conversations.update_one({"session_id": conv_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
             return ChatOut(reply=pr)
         if p and pending_p == "coverage" and (has_coords or in_.message.strip()):
             if has_coords:
@@ -325,17 +333,20 @@ def chat(in_: ChatIn):
             if lower_msg in ("yes", "y"):
                 providers.update_one({"_id": p["_id"]}, {"$set": {"active": True}, "$unset": {"pending_field": ""}})
                 pr = "Fantastic! 🎉 You are now live as a provider. You'll receive booking requests here."
-                db.conversations.update_one({"session_id": in_.session_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
+                db.conversations.update_one({"session_id": conv_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
+                _log_and_close(db, conv_id, phone)
                 return ChatOut(reply=pr)
             elif lower_msg in ("no", "n"):
                 providers.update_one({"_id": p["_id"]}, {"$set": {"active": False}, "$unset": {"pending_field": ""}})
                 pr = "No problem. You're registered but not live. Say 'go live' anytime to start receiving requests."
-                db.conversations.update_one({"session_id": in_.session_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
+                db.conversations.update_one({"session_id": conv_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
+                _log_and_close(db, conv_id, phone)
                 return ChatOut(reply=pr)
             elif "go live" in lower_msg:
                 providers.update_one({"_id": p["_id"]}, {"$set": {"active": True}, "$unset": {"pending_field": ""}})
                 pr = "You're now live and ready to receive bookings!"
-                db.conversations.update_one({"session_id": in_.session_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
+                db.conversations.update_one({"session_id": conv_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
+                _log_and_close(db, conv_id, phone)
                 return ChatOut(reply=pr)
 
     fast_mode = bool(getattr(in_, "fast", False))
