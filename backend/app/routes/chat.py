@@ -42,6 +42,15 @@ def _variants(mid: str) -> list[str]:
         c.append(f"{mid}-v1:0")
     return c
 
+def _extract_phone(s: str | None) -> str | None:
+    if not s:
+        return None
+    v = s
+    if "@" in v:
+        v = v.split("@", 1)[0]
+    v = "".join(ch for ch in v if (ch.isdigit() or ch == "+"))
+    return v if any(c.isdigit() for c in v) else None
+
 class ChatIn(BaseModel):
     session_id: str
     user_id: str
@@ -64,6 +73,47 @@ def chat(in_: ChatIn):
     )
 
     messages = [{"role": "user", "content": [{"text": in_.message}]}]
+    phone = _extract_phone(getattr(in_, "user_id", None)) or _extract_phone(getattr(in_, "session_id", None))
+    if phone:
+        users = db.users
+        u = users.find_one({"phone": phone})
+        if not u:
+            users.insert_one({"phone": phone, "reg_step": 1})
+            reply = "Welcome! What's your full name?"
+            db.conversations.update_one(
+                {"session_id": in_.session_id},
+                {"$push": {"messages": {"role": "assistant", "content": [{"text": reply}]}}},
+            )
+            return ChatOut(reply=reply)
+        step = int(u.get("reg_step", 0) or 0)
+        if step == 1:
+            users.update_one({"_id": u["_id"]}, {"$set": {"name": in_.message.strip(), "reg_step": 2}})
+            reply = "Thanks! Where are you located?"
+            db.conversations.update_one(
+                {"session_id": in_.session_id},
+                {"$push": {"messages": {"role": "assistant", "content": [{"text": reply}]}}},
+            )
+            return ChatOut(reply=reply)
+        if step == 2:
+            users.update_one({"_id": u["_id"]}, {"$set": {"location": in_.message.strip(), "reg_step": 3}})
+            reply = "Do you agree to our policy? (yes/no)"
+            db.conversations.update_one(
+                {"session_id": in_.session_id},
+                {"$push": {"messages": {"role": "assistant", "content": [{"text": reply}]}}},
+            )
+            return ChatOut(reply=reply)
+        if step == 3:
+            ans = (in_.message or "").strip().lower()
+            if ans in ("yes", "y"):
+                users.update_one({"_id": u["_id"]}, {"$set": {"policy_agreed": True, "reg_step": 0}})
+                reply = "Registration complete! How can I help you today?"
+            else:
+                reply = "You need to agree to the policy to continue."
+            db.conversations.update_one(
+                {"session_id": in_.session_id},
+                {"$push": {"messages": {"role": "assistant", "content": [{"text": reply}]}}},
+            )
+            return ChatOut(reply=reply)
     fast_mode = bool(getattr(in_, "fast", False))
     max_tokens = 120 if fast_mode else 400
     temperature = 0.3 if fast_mode else 0.4
