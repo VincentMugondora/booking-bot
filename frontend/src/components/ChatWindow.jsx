@@ -40,8 +40,8 @@ export default function ChatWindow() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, pending]);
 
-  async function onSend() {
-    const text = input.trim();
+  async function onSend(customText) {
+    const text = (customText ?? input).trim();
     if (!text || pending) return;
     setInput("");
     setMessages((m) => [...m, { role: "user", text }]);
@@ -71,7 +71,7 @@ export default function ChatWindow() {
       <div className="w-full max-w-5xl h-[90vh] md:h-[85vh] grid grid-rows-[auto_1fr_auto] rounded-[28px] border border-white/40 bg-white/70 backdrop-blur-xl shadow-2xl">
         <Header userId={userId} />
         {messages.length === 0 ? (
-          <Hero onPick={(t) => setInput(t)} />
+          <Hero onPick={onSend} />
         ) : (
           <MessageList messages={messages} pending={pending} bottomRef={bottomRef} />
         )}
