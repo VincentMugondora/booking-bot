@@ -230,7 +230,7 @@ def chat(in_: ChatIn):
                         else:
                             lines.append(f"Client {it.get('user_id')} from {siso} to {eiso}")
                     pr = "\n".join(lines)
-                db.conversations.update_one({"session_id": in_.session_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
+                db.conversations.update_one({"session_id": conv_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
                 return ChatOut(reply=pr)
 
         # Compute missing fields
@@ -312,7 +312,7 @@ def chat(in_: ChatIn):
             else:
                 providers.update_one({"_id": p["_id"]}, {"$set": {"coverage": in_.message.strip(), "pending_field": "policy"}})
             pr = "Do you agree to our service provider policy and terms? (yes/no)"
-            db.conversations.update_one({"session_id": in_.session_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
+            db.conversations.update_one({"session_id": conv_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
             return ChatOut(reply=pr)
         if p and pending_p == "policy":
             ans = lower_msg
@@ -323,11 +323,11 @@ def chat(in_: ChatIn):
                 pr = ("✅ Thank you! You're now registered as a service provider.\n"
                       f"Provider Name: {p.get('name','')}\nService Type: {p.get('service_type','')}\nCoverage: {p.get('coverage','')}\nPolicy Agreed: Yes\nProvider ID: {prov_id}\n\n"
                       "Would you like to go live and start receiving booking requests now? (yes/no)")
-                db.conversations.update_one({"session_id": in_.session_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
+                db.conversations.update_one({"session_id": conv_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
                 return ChatOut(reply=pr)
             else:
                 pr = "You need to agree to the provider policy to continue. Do you agree? (yes/no)"
-                db.conversations.update_one({"session_id": in_.session_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
+                db.conversations.update_one({"session_id": conv_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
                 return ChatOut(reply=pr)
         if p and pending_p == "activate":
             if lower_msg in ("yes", "y"):
