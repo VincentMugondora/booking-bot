@@ -16,5 +16,8 @@ class Settings:
         self.USE_LOCAL_LLM = os.getenv("USE_LOCAL_LLM", "false").lower() in ("1", "true", "yes")
         self.POLICY_URL = os.getenv("POLICY_URL", "https://hustlr.app/policy")
         self.PROVIDER_POLICY_URL = os.getenv("PROVIDER_POLICY_URL", "https://hustlr.app/provider-policy")
+        # logging
+        self.LOG_TO_FILE = os.getenv("LOG_TO_FILE", "true").lower() in ("1", "true", "yes")
+        self.LOG_FILE = os.getenv("LOG_FILE", "logs/hustlr.log")
 
 settings = Settings()
