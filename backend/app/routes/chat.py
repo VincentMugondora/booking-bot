@@ -599,6 +599,33 @@ def chat(in_: ChatIn):
                 draft = merged
                 bstate = None
 
+        # Auto-fill address from user's saved addresses when missing
+        if not draft.get("address"):
+            u_doc = db.users.find_one({"phone": phone}) or None
+            def_addr = _get_default_address(u_doc)
+            # if multiple addresses and no default, ask to choose
+            addrs = (u_doc or {}).get("addresses") if u_doc else None
+            if def_addr:
+                draft["address"] = def_addr
+            elif isinstance(addrs, list) and len(addrs) > 1:
+                lines = ["Please choose an address:"]
+                opts = []
+                for i, a in enumerate(addrs[:9], start=1):
+                    if not isinstance(a, dict):
+                        continue
+                    street = a.get("street") or ""
+                    suburb = a.get("suburb") or ""
+                    city = a.get("city") or ""
+                    label = ", ".join([p for p in [street, suburb, city] if p]) or "(Unnamed)"
+                    lines.append(f"{i}. {label}")
+                    opts.append({"street": street, "suburb": suburb, "city": city})
+                lines.append("Reply with 1-" + str(len(opts)) + " to pick your address.")
+                pr = "\n".join(lines)
+                db.conversations.update_one({"session_id": conv_id}, {"$set": {"address_options": opts, "booking_draft": draft, "booking_state": "awaiting_address_choice"}})
+                db.conversations.update_one({"session_id": conv_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
+                _print_msg(conv_id, phone, "assistant", pr)
+                return ChatOut(reply=pr)
+
         # Provider selection handling (before confirmation)
         if (bstate == "awaiting_provider_choice" or (prov_opts and not draft.get("provider_id"))):
             chosen = None
