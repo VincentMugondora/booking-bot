@@ -6,6 +6,8 @@ from app.services.bedrock_client import converse, extract_text
 from app.config import settings
 from botocore.exceptions import ClientError
 from app.services.geocode import reverse_geocode
+from datetime import datetime
+import uuid
 
 router = APIRouter(prefix="/v1/chat", tags=["chat"])
 logger = logging.getLogger(__name__)
@@ -55,6 +57,29 @@ def _extract_phone(s: str | None) -> str | None:
     v = "".join(ch for ch in v if (ch.isdigit() or ch == "+"))
     return v if any(c.isdigit() for c in v) else None
 
+def _log_and_close(db, conv_id: str, phone: str | None) -> None:
+    conv = db.conversations.find_one({"session_id": conv_id})
+    if not conv:
+        return
+    lines = [
+        f"=== Hustlr Conversation {conv.get('session_id')} ===",
+        f"Phone: {phone}",
+        f"Started: {conv.get('started_at')}",
+        "Transcript:",
+    ]
+    for m in conv.get("messages", []):
+        role = m.get("role") or "assistant"
+        texts = []
+        for c in m.get("content", []):
+            if isinstance(c, dict) and "text" in c:
+                texts.append(c.get("text", ""))
+        lines.append(f"{role.upper()}: {' '.join(texts).strip()}")
+    logging.getLogger(__name__).info("\n".join(lines))
+    db.conversations.update_one(
+        {"session_id": conv_id},
+        {"$set": {"status": "closed", "ended_at": datetime.utcnow().isoformat()}},
+    )
+
 class ChatIn(BaseModel):
     session_id: str
     user_id: str
@@ -69,15 +94,36 @@ class ChatOut(BaseModel):
 @router.post("", response_model=ChatOut)
 def chat(in_: ChatIn):
     db = get_db()
+    phone = _extract_phone(getattr(in_, "user_id", None)) or _extract_phone(getattr(in_, "session_id", None))
+    conv_id: str
+    if phone:
+        open_conv = db.conversations.find_one({"phone": phone, "status": {"$ne": "closed"}})
+        if open_conv:
+            conv_id = open_conv.get("session_id")
+        else:
+            conv_id = str(uuid.uuid4())
+            db.conversations.insert_one({
+                "session_id": conv_id,
+                "phone": phone,
+                "status": "open",
+                "started_at": datetime.utcnow().isoformat(),
+                "messages": [],
+            })
+    else:
+        conv_id = in_.session_id
+        db.conversations.update_one(
+            {"session_id": conv_id},
+            {"$setOnInsert": {"session_id": conv_id, "status": "open", "started_at": datetime.utcnow().isoformat()}},
+            upsert=True,
+        )
+
     db.conversations.update_one(
-        {"session_id": in_.session_id},
-        {"$setOnInsert": {"session_id": in_.session_id},
-         "$push": {"messages": {"role": "user", "content": [{"text": in_.message}]}}},
+        {"session_id": conv_id},
+        {"$push": {"messages": {"role": "user", "content": [{"text": in_.message}]}}},
         upsert=True,
     )
 
     messages = [{"role": "user", "content": [{"text": in_.message}]}]
-    phone = _extract_phone(getattr(in_, "user_id", None)) or _extract_phone(getattr(in_, "session_id", None))
     if phone:
         users = db.users
         u = users.find_one({"phone": phone})
@@ -120,7 +166,13 @@ def chat(in_: ChatIn):
                 })
                 db.providers.update_one({"phone": phone}, {"$unset": {"pending_field": ""}}, upsert=False)
                 pr = "Your profile has been reset. Let's start over — what's your full name?"
-                db.conversations.update_one({"session_id": in_.session_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
+                db.conversations.update_one({"session_id": conv_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
+                return ChatOut(reply=pr)
+            # /end: close current conversation and print transcript
+            if cmd == '/end':
+                pr = "Conversation closed. Send a new message to start a fresh conversation."
+                db.conversations.update_one({"session_id": conv_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
+                _log_and_close(db, conv_id, phone)
                 return ChatOut(reply=pr)
             # /profile: show user profile
             if cmd == '/profile':
@@ -215,7 +267,7 @@ def chat(in_: ChatIn):
                 )
             users.update_one({"_id": u["_id"]}, {"$set": {"pending_field": next_field}})
             db.conversations.update_one(
-                {"session_id": in_.session_id},
+                {"session_id": conv_id},
                 {"$push": {"messages": {"role": "assistant", "content": [{"text": reg_reply}]}}},
             )
             return ChatOut(reply=reg_reply)
@@ -232,12 +284,12 @@ def chat(in_: ChatIn):
             res = providers.insert_one({"phone": phone, "active": False, "policy_agreed": False, "pending_field": "name"})
             p = providers.find_one({"_id": res.inserted_id})
             pr = "Great! Let's get you registered as a service provider. What's your full name?"
-            db.conversations.update_one({"session_id": in_.session_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
+            db.conversations.update_one({"session_id": conv_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
             return ChatOut(reply=pr)
         if p and pending_p == "name" and in_.message.strip():
             providers.update_one({"_id": p["_id"]}, {"$set": {"name": in_.message.strip(), "pending_field": "service_type"}})
             pr = "Thanks! What type of service do you provide? (e.g., plumbing, electrical, cleaning)"
-            db.conversations.update_one({"session_id": in_.session_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
+            db.conversations.update_one({"session_id": conv_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
             return ChatOut(reply=pr)
         if p and pending_p == "service_type" and in_.message.strip():
             providers.update_one({"_id": p["_id"]}, {"$set": {"service_type": in_.message.strip()}, "${unset}": {}})
@@ -323,7 +375,7 @@ def chat(in_: ChatIn):
             reply = local_reply(in_.message)
 
     db.conversations.update_one(
-        {"session_id": in_.session_id},
+        {"session_id": conv_id},
         {"$push": {"messages": {"role": "assistant", "content": [{"text": reply}]}}},
     )
     return ChatOut(reply=reply)
