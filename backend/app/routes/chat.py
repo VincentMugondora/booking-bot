@@ -78,42 +78,67 @@ def chat(in_: ChatIn):
         users = db.users
         u = users.find_one({"phone": phone})
         if not u:
-            users.insert_one({"phone": phone, "reg_step": 1})
-            reply = "Welcome! What's your full name?"
-            db.conversations.update_one(
-                {"session_id": in_.session_id},
-                {"$push": {"messages": {"role": "assistant", "content": [{"text": reply}]}}},
-            )
-            return ChatOut(reply=reply)
-        step = int(u.get("reg_step", 0) or 0)
-        if step == 1:
-            users.update_one({"_id": u["_id"]}, {"$set": {"name": in_.message.strip(), "reg_step": 2}})
-            reply = "Thanks! Where are you located?"
-            db.conversations.update_one(
-                {"session_id": in_.session_id},
-                {"$push": {"messages": {"role": "assistant", "content": [{"text": reply}]}}},
-            )
-            return ChatOut(reply=reply)
-        if step == 2:
-            users.update_one({"_id": u["_id"]}, {"$set": {"location": in_.message.strip(), "reg_step": 3}})
-            reply = "Do you agree to our policy? (yes/no)"
-            db.conversations.update_one(
-                {"session_id": in_.session_id},
-                {"$push": {"messages": {"role": "assistant", "content": [{"text": reply}]}}},
-            )
-            return ChatOut(reply=reply)
-        if step == 3:
+            users.insert_one({"phone": phone, "policy_agreed": False})
+            u = users.find_one({"phone": phone})
+        # If we previously asked for a field, try to store the answer now
+        pending = (u or {}).get("pending_field")
+        if pending == "name" and in_.message.strip():
+            users.update_one({"_id": u["_id"]}, {"$set": {"name": in_.message.strip()}, "$unset": {"pending_field": ""}})
+            u = users.find_one({"_id": u["_id"]})
+        elif pending == "location" and in_.message.strip():
+            users.update_one({"_id": u["_id"]}, {"$set": {"location": in_.message.strip()}, "$unset": {"pending_field": ""}})
+            u = users.find_one({"_id": u["_id"]})
+        elif pending == "policy":
             ans = (in_.message or "").strip().lower()
-            if ans in ("yes", "y"):
-                users.update_one({"_id": u["_id"]}, {"$set": {"policy_agreed": True, "reg_step": 0}})
-                reply = "Registration complete! How can I help you today?"
-            else:
-                reply = "You need to agree to the policy to continue."
+            if ans in ("yes", "y", "agree", "i agree"):
+                users.update_one({"_id": u["_id"]}, {"$set": {"policy_agreed": True}, "$unset": {"pending_field": ""}})
+            u = users.find_one({"_id": u["_id"]})
+
+        # Compute missing fields
+        missing: list[str] = []
+        if not u.get("name"):
+            missing.append("name")
+        if not u.get("location"):
+            missing.append("location")
+        if not u.get("policy_agreed", False):
+            missing.append("policy")
+
+        if missing:
+            next_field = missing[0]
+            prompt_text = (
+                f"The user is registering. Their information so far:\n"
+                f"Name: {u.get('name')}\n"
+                f"Location: {u.get('location')}\n"
+                f"Policy agreed: {u.get('policy_agreed', False)}\n\n"
+                f"Ask the user for the next missing field ({next_field}) in a friendly, brief way. "
+                f"Respond only with the question to send to the user."
+            )
+            reg_messages = [{"role": "user", "content": [{"text": prompt_text}]}]
+            try:
+                resp = converse(
+                    messages=reg_messages,
+                    system_prompt=SYSTEM_PROMPT,
+                    model_id=settings.BEDROCK_FAST_MODEL_ID,
+                    max_tokens=80,
+                    temperature=0.2,
+                )
+                reg_reply = extract_text(resp) or (
+                    "What's your full name?" if next_field == "name" else (
+                        "Where are you located?" if next_field == "location" else "Do you agree to our policy? (yes/no)"
+                    )
+                )
+            except Exception:
+                reg_reply = (
+                    "What's your full name?" if next_field == "name" else (
+                        "Where are you located?" if next_field == "location" else "Do you agree to our policy? (yes/no)"
+                    )
+                )
+            users.update_one({"_id": u["_id"]}, {"$set": {"pending_field": next_field}})
             db.conversations.update_one(
                 {"session_id": in_.session_id},
-                {"$push": {"messages": {"role": "assistant", "content": [{"text": reply}]}}},
+                {"$push": {"messages": {"role": "assistant", "content": [{"text": reg_reply}]}}},
             )
-            return ChatOut(reply=reply)
+            return ChatOut(reply=reg_reply)
     fast_mode = bool(getattr(in_, "fast", False))
     max_tokens = 120 if fast_mode else 400
     temperature = 0.3 if fast_mode else 0.4
