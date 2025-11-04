@@ -594,27 +594,50 @@ def chat(in_: ChatIn):
                     parts = [p.strip() for p in user_location.split(",") if p.strip()]
                     addr = {"street": None, "suburb": parts[-2] if len(parts) >= 2 else None, "city": parts[-1] if parts else None}
                     merged["address"] = addr
-                book = {
-                    "user_id": phone,
-                    "service": merged.get("service"),
-                    "issue": merged.get("issue"),
-                    "date_time": merged.get("date_time"),
-                    "address": merged.get("address"),
-                    "provider_id": merged.get("provider_id"),
-                    "provider_name": merged.get("provider_name"),
-                    "status": "confirmed",
-                    "created_at": datetime.utcnow().isoformat(),
-                }
-                db.booking_requests.insert_one(book)
-                db.conversations.update_one({"session_id": conv_id}, {"$unset": {"booking_draft": "", "booking_state": ""}})
                 dt_str = merged.get("date_time")
                 try:
-                    dt_disp = datetime.fromisoformat(dt_str).strftime('%Y-%m-%d %I:%M %p') if dt_str else dt_str
+                    start_dt = datetime.fromisoformat(dt_str) if dt_str else None
+                except Exception:
+                    start_dt = None
+                slot_minutes = 60
+                end_dt = (start_dt + timedelta(minutes=slot_minutes)) if start_dt else None
+                provider_id = merged.get("provider_id")
+                provider_name = merged.get("provider_name") or "Provider"
+                u_doc = db.users.find_one({"phone": phone}) or None
+                # Re-check availability and auto-assign alternative if needed
+                if start_dt and provider_id and not _is_provider_available(db, provider_id, start_dt, end_dt):
+                    alternatives = _find_nearby_providers(db, merged.get("service"), u_doc, desired_start=start_dt, slot_minutes=slot_minutes)
+                    alt = next((p for p in alternatives if p.get("available") and str(p.get("_id")) != provider_id), None)
+                    if alt:
+                        provider_id = str(alt.get("_id"))
+                        provider_name = alt.get("name") or provider_name
+                    else:
+                        pr = "No providers are available at that time. Please share another time that works for you."
+                        db.conversations.update_one({"session_id": conv_id}, {"$set": {"booking_draft": merged, "booking_state": "collecting"}})
+                        db.conversations.update_one({"session_id": conv_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
+                        _print_msg(conv_id, phone, "assistant", pr)
+                        return ChatOut(reply=pr)
+                # Insert into bookings collection
+                booking_doc = {
+                    "user_id": phone,
+                    "provider_id": provider_id,
+                    "start": start_dt,
+                    "end": end_dt,
+                    "notes": merged.get("issue"),
+                    "service": merged.get("service"),
+                    "address": merged.get("address"),
+                    "created_at": datetime.utcnow(),
+                }
+                db.bookings.insert_one(booking_doc)
+                db.conversations.update_one({"session_id": conv_id}, {"$unset": {"booking_draft": "", "booking_state": "", "provider_options": ""}})
+                # Confirmation message
+                try:
+                    dt_disp = start_dt.strftime('%Y-%m-%d %I:%M %p') if start_dt else dt_str
                 except Exception:
                     dt_disp = dt_str
                 addr = merged.get("address") or {}
                 addr_str = ", ".join([p for p in [addr.get("street"), addr.get("suburb"), addr.get("city")] if p])
-                pr = f"Done! Your {merged.get('service','service')} is booked for {dt_disp} at {addr_str}."
+                pr = f"Done! Booked {provider_name} for {dt_disp} at {addr_str}."
                 db.conversations.update_one({"session_id": conv_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
                 _print_msg(conv_id, phone, "assistant", pr)
                 return ChatOut(reply=pr)
