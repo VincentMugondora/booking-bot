@@ -4,6 +4,7 @@ from app.routes.chat import router as chat_router
 from app.routes.providers import router as providers_router
 from app.routes.bookings import router as bookings_router
 from fastapi.middleware.cors import CORSMiddleware
+from app.routes.models import router as models_router
 
 app = FastAPI(title="Booking Assistant API")
 
@@ -20,6 +21,7 @@ app.add_middleware(
 app.include_router(chat_router)
 app.include_router(providers_router)
 app.include_router(bookings_router)
+app.include_router(models_router)
 
 @app.get("/health")
 def health():

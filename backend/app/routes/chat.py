@@ -32,6 +32,16 @@ def local_reply(text: str) -> str:
         return "Great. Any budget range I should consider before I suggest options?"
     return "How can I help with booking today? Share the service, location, and preferred time."
 
+def _variants(mid: str) -> list[str]:
+    if not mid:
+        return []
+    c = [mid]
+    if mid.endswith("-v1:0"):
+        c.append(mid[:-5])
+    else:
+        c.append(f"{mid}-v1:0")
+    return c
+
 class ChatIn(BaseModel):
     session_id: str
     user_id: str
@@ -56,12 +66,16 @@ def chat(in_: ChatIn):
     if settings.USE_LOCAL_LLM:
         reply = local_reply(in_.message)
     else:
-        model_candidates = [
-            settings.BEDROCK_MODEL_ID,
-            "anthropic.claude-3-haiku-20240307",
-            "amazon.titan-text-lite-v1",
-        ]
+        _mc = _variants(settings.BEDROCK_MODEL_ID) + _variants("anthropic.claude-3-haiku-20240307")
+        # de-duplicate while preserving order
+        seen = set()
+        model_candidates = []
+        for m in _mc:
+            if m and m not in seen:
+                model_candidates.append(m)
+                seen.add(m)
         reply = None
+        logger.info("Trying Bedrock model candidates: %s", model_candidates)
         for mid in model_candidates:
             try:
                 resp = converse(messages=messages, system_prompt=SYSTEM_PROMPT, model_id=mid)
