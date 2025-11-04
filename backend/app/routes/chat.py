@@ -58,6 +58,17 @@ def _extract_phone(s: str | None) -> str | None:
     v = "".join(ch for ch in v if (ch.isdigit() or ch == "+"))
     return v if any(c.isdigit() for c in v) else None
 
+def _norm_tokens(s: str) -> set[str]:
+    t = re.findall(r"[a-z]+", (s or "").lower())
+    out: set[str] = set()
+    for w in t:
+        for suf in ("ers", "ments", "ment", "ing", "ers", "er", "ed", "s"):
+            if w.endswith(suf) and len(w) > len(suf) + 2:
+                w = w[: -len(suf)]
+                break
+        out.add(w)
+    return out
+
 def _parse_natural_datetime(text: str) -> datetime | None:
     t = (text or "").lower()
     base = None
@@ -653,6 +664,23 @@ def chat(in_: ChatIn):
         for k, v in (extracted or {}).items():
             if v and (k not in merged or not merged.get(k)):
                 merged[k] = v
+        # Fallback: infer service by matching DB service_type strings in user message (fuzzy token match)
+        if not merged.get("service"):
+            try:
+                svc_vals = [s for s in db.providers.distinct("service_type") if isinstance(s, str) and s]
+            except Exception:
+                svc_vals = []
+            msg_tokens = _norm_tokens(in_.message or "")
+            cand = None
+            best_score = 0
+            for st in svc_vals:
+                st_tokens = _norm_tokens(st)
+                score = len(msg_tokens & st_tokens)
+                if score > best_score or (score == best_score and cand and len(st) > len(cand)):
+                    best_score = score
+                    cand = st
+            if best_score > 0 and cand:
+                merged["service"] = cand
         required = ["service", "issue", "date_time", "address", "provider_id"]
         missing = [k for k in required if not merged.get(k)]
         # If service identified but no provider chosen, list nearby options
