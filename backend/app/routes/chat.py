@@ -1,4 +1,5 @@
 from fastapi import APIRouter
+import logging
 from pydantic import BaseModel
 from app.db.mongo_client import get_db
 from app.services.bedrock_client import converse, extract_text
@@ -6,6 +7,7 @@ from app.config import settings
 from botocore.exceptions import ClientError
 
 router = APIRouter(prefix="/v1/chat", tags=["chat"])
+logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = (
     "You are a friendly, concise booking assistant. "
@@ -46,11 +48,14 @@ def chat(in_: ChatIn):
             reply = extract_text(resp)
             if reply:
                 break
-        except ClientError:
+        except ClientError as e:
+            logger.warning("Bedrock client error for model %s: %s", mid, e, exc_info=True)
             continue
-        except Exception:
+        except Exception as e:
+            logger.exception("Unexpected Bedrock error for model %s: %s", mid, e)
             continue
     if not reply:
+        logger.error("All Bedrock model attempts failed: %s", model_candidates)
         reply = "I'm having trouble reaching the AI right now. Please try again shortly."
 
     db.conversations.update_one(
