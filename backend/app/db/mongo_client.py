@@ -22,3 +22,5 @@ def init_indexes() -> None:
     db.providers.create_index([("services", ASCENDING)])
     db.bookings.create_index([("provider_id", ASCENDING), ("start", ASCENDING)])
     db.conversations.create_index([("session_id", ASCENDING)], unique=True)
+    db.users.create_index([("phone", ASCENDING)], unique=True)
+    db.providers.create_index([("phone", ASCENDING)], unique=True)

@@ -122,6 +122,7 @@ def chat(in_: ChatIn):
                 f"Location: {u.get('location')}\n"
                 f"Policy agreed: {u.get('policy_agreed', False)}\n\n"
                 f"Ask the user for the next missing field ({next_field}) in a friendly, brief way. "
+                f"Include a short hint with the policy URL when asking for policy. Customer policy: {settings.POLICY_URL}. "
                 f"Respond only with the question to send to the user."
             )
             reg_messages = [{"role": "user", "content": [{"text": prompt_text}]}]

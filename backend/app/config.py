@@ -14,5 +14,7 @@ class Settings:
         self.JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
         self.PORT = int(os.getenv("PORT", "8000"))
         self.USE_LOCAL_LLM = os.getenv("USE_LOCAL_LLM", "false").lower() in ("1", "true", "yes")
+        self.POLICY_URL = os.getenv("POLICY_URL", "https://hustlr.app/policy")
+        self.PROVIDER_POLICY_URL = os.getenv("PROVIDER_POLICY_URL", "https://hustlr.app/provider-policy")
 
 settings = Settings()
