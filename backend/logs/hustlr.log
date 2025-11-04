@@ -80,3 +80,28 @@ Kana waisa EcoCash Unoudza munyori wako zita rinobuda panumber dzako. SCREENSHOT
 
 *DOLLAR NETONE AIRTIME PALINK APO🍃🍃🍃*
 https://wa.me/message/NPMOAMTME5CHN1
+2025-11-04 14:25:51,779 INFO app.routes.chat: 2025-11-04T12:25:51.779337 Hustlr [120363370812754953|4c19bde9-860d-4622-9f8d-c76707e74026] ASSISTANT: Have you reviewed and agreed to our customer policy? You can find it here: https://hustlr.app/policy
+2025-11-04 14:27:11,649 INFO app.routes.chat: 2025-11-04T12:27:11.648844 Hustlr [120363389509569459|7fe00417-cb0d-4a69-8598-aebf89259986] USER: *anotsvagawo hama dzake neuyo anodawo kunzwa zvinosangana nevamwe muyoenyu pinda muchannel iri padenga  iyo mudikani*☝️☝️☝️☝️
+2025-11-04 14:27:13,829 INFO app.routes.chat: 2025-11-04T12:27:13.829089 Hustlr [120363389509569459|7fe00417-cb0d-4a69-8598-aebf89259986] ASSISTANT: What is your name?
+2025-11-04 14:27:39,207 INFO app.routes.chat: 2025-11-04T12:27:39.207723 Hustlr [263777530322|cccf0768-a64e-4274-8dbe-c9273576b191] USER: hello
+2025-11-04 14:27:39,659 INFO app.routes.chat: 2025-11-04T12:27:39.659183 Hustlr [263777530322|cccf0768-a64e-4274-8dbe-c9273576b191] ASSISTANT: Could you provide the following info: service, issue, date_time, provider_id?
+2025-11-04 14:28:09,596 INFO app.routes.chat: 2025-11-04T12:28:09.596718 Hustlr [263777530322|cccf0768-a64e-4274-8dbe-c9273576b191] USER: l want to register as a provider
+2025-11-04 14:28:09,966 INFO app.routes.chat: 2025-11-04T12:28:09.966038 Hustlr [263777530322|cccf0768-a64e-4274-8dbe-c9273576b191] ASSISTANT: Great! Let's get you registered as a service provider. What's your full name?
+2025-11-04 14:28:22,819 INFO app.routes.chat: 2025-11-04T12:28:22.819135 Hustlr [263777530322|cccf0768-a64e-4274-8dbe-c9273576b191] USER: Vincent Mugondora
+2025-11-04 14:28:23,161 INFO app.routes.chat: 2025-11-04T12:28:23.160942 Hustlr [263777530322|cccf0768-a64e-4274-8dbe-c9273576b191] ASSISTANT: Thanks! What type of service do you provide? (e.g., plumbing, electrical, cleaning)
+2025-11-04 14:28:33,172 INFO app.routes.chat: 2025-11-04T12:28:33.172303 Hustlr [263777530322|cccf0768-a64e-4274-8dbe-c9273576b191] USER: Web Development
+2025-11-04 14:34:21,743 INFO app.routes.chat: 2025-11-04T12:34:21.742765 Hustlr [263777530322|cccf0768-a64e-4274-8dbe-c9273576b191] USER: l want to register as a provider
+2025-11-04 14:34:22,082 INFO app.routes.chat: 2025-11-04T12:34:22.082467 Hustlr [263777530322|cccf0768-a64e-4274-8dbe-c9273576b191] ASSISTANT: Where is your service located or what area do you cover? (send city/suburb or share current location). Provider policy: https://hustlr.app/provider-policy
+2025-11-04 14:34:39,592 INFO app.routes.chat: 2025-11-04T12:34:39.592033 Hustlr [263777530322|cccf0768-a64e-4274-8dbe-c9273576b191] USER: Harare
+2025-11-04 14:34:39,874 INFO app.routes.chat: 2025-11-04T12:34:39.874535 Hustlr [263777530322|cccf0768-a64e-4274-8dbe-c9273576b191] ASSISTANT: Do you agree to our service provider policy and terms? (yes/no)
+2025-11-04 14:34:44,875 INFO app.routes.chat: 2025-11-04T12:34:44.874889 Hustlr [263777530322|cccf0768-a64e-4274-8dbe-c9273576b191] USER: yes
+2025-11-04 14:34:45,199 INFO app.routes.chat: 2025-11-04T12:34:45.199036 Hustlr [263777530322|cccf0768-a64e-4274-8dbe-c9273576b191] ASSISTANT: ✅ Thank you! You're now registered as a service provider.
+Provider Name: Vincent Mugondora
+Service Type: l want to register as a provider
+Coverage: Harare
+Policy Agreed: Yes
+Provider ID: 6909f1596f914b83e7569f13
+
+Would you like to go live and start receiving booking requests now? (yes/no)
+2025-11-04 14:38:57,882 INFO app.routes.chat: 2025-11-04T12:38:57.882508 Hustlr [263777530322|cccf0768-a64e-4274-8dbe-c9273576b191] USER: l want to book a web developer
+2025-11-04 14:38:58,366 INFO app.routes.chat: 2025-11-04T12:38:58.366025 Hustlr [263777530322|cccf0768-a64e-4274-8dbe-c9273576b191] ASSISTANT: Could you provide the following info: service, issue, date_time, provider_id?

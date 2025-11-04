@@ -486,7 +486,7 @@ def chat(in_: ChatIn):
             _print_msg(conv_id, phone, "assistant", pr)
             return ChatOut(reply=pr)
         if p and pending_p == "service_type" and in_.message.strip():
-            providers.update_one({"_id": p["_id"]}, {"$set": {"service_type": in_.message.strip()}, "${unset}": {}})
+            providers.update_one({"_id": p["_id"]}, {"$set": {"service_type": in_.message.strip()}})
             providers.update_one({"_id": p["_id"]}, {"$set": {"pending_field": "coverage"}})
             pr = f"Where is your service located or what area do you cover? (send city/suburb or share current location). Provider policy: {settings.PROVIDER_POLICY_URL}"
             db.conversations.update_one({"session_id": conv_id}, {"$push": {"messages": {"role": "assistant", "content": [{"text": pr}]}}})
