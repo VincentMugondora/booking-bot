@@ -135,28 +135,85 @@ def _extract_booking_entities(text: str, user_location: str | None) -> tuple[dic
     missing = [k for k in required if k not in result]
     return result, missing
 
-def _find_nearby_providers(db, service: str, u: dict | None, max_distance_m: int = 30000) -> list[dict]:
+def _get_user_coords(u: dict | None):
+    if not u:
+        return None
+    c = (u or {}).get("coords") or {}
+    if not isinstance(c, dict):
+        return None
+    coords = c.get("coordinates")
+    if isinstance(coords, list) and len(coords) == 2:
+        return (coords[0], coords[1])
+    return None
+
+def _eta_from_meters(distance_m: float | None, speed_kph: float = 35.0) -> int | None:
+    if not distance_m or distance_m <= 0:
+        return None
+    km = distance_m / 1000.0
+    minutes = km / speed_kph * 60.0
+    return int(round(minutes))
+
+def _is_provider_available(db, provider_id: str, start_dt: datetime, end_dt: datetime) -> bool:
+    if not provider_id or not start_dt or not end_dt:
+        return True
+    conflict = db.bookings.find_one({
+        "provider_id": provider_id,
+        "$or": [
+            {"start": {"$lt": end_dt}, "end": {"$gt": start_dt}}
+        ]
+    })
+    return conflict is None
+
+def _find_nearby_providers(db, service: str, u: dict | None, desired_start: datetime | None = None, slot_minutes: int = 60, max_distance_m: int = 30000) -> list[dict]:
     if not service:
         return []
-    coords = None
-    if u:
-        c = (u or {}).get("coords") or {}
-        if isinstance(c, dict):
-            coords = c.get("coordinates")
-    query = {"active": True, "service_type": service}
-    if isinstance(coords, list) and len(coords) == 2:
-        lng, lat = coords[0], coords[1]
-        query["coverage_coords"] = {
-            "$near": {
-                "$geometry": {"type": "Point", "coordinates": [lng, lat]},
-                "$maxDistance": max_distance_m,
-            }
-        }
-        cur = db.providers.find(query).limit(5)
-        return list(cur)
-    # Fallback: no coords; return top few active providers of that service
-    cur = db.providers.find({"active": True, "service_type": service}).limit(5)
-    return list(cur)
+    user_coords = _get_user_coords(u)
+    qry = {"active": True, "service_type": service}
+    results: list[dict] = []
+    if user_coords:
+        lng, lat = user_coords
+        pipeline = [
+            {"$geoNear": {
+                "near": {"type": "Point", "coordinates": [lng, lat]},
+                "distanceField": "distance_m",
+                "spherical": True,
+                "maxDistance": max_distance_m,
+                "query": qry,
+            }},
+            {"$limit": 10},
+        ]
+        results = list(db.providers.aggregate(pipeline))
+    else:
+        # no coords — basic list
+        results = list(db.providers.find(qry).limit(10))
+
+    # annotate and rank
+    desired_end = (desired_start + timedelta(minutes=slot_minutes)) if desired_start else None
+    enriched = []
+    for pv in results:
+        dist_m = pv.get("distance_m") if isinstance(pv.get("distance_m"), (int, float)) else None
+        eta_min = _eta_from_meters(dist_m)
+        rating = pv.get("rating") or 0
+        prov_id = str(pv.get("_id")) if pv.get("_id") else None
+        available = True
+        if desired_start and prov_id:
+            available = _is_provider_available(db, prov_id, desired_start, desired_end)
+        enriched.append({
+            **pv,
+            "distance_m": dist_m,
+            "eta_min": eta_min,
+            "rating": rating,
+            "available": available,
+        })
+    # sort: available desc, rating desc, distance asc
+    def sort_key(p):
+        return (
+            0 if p.get("available") else 1,
+            -(p.get("rating") or 0),
+            p.get("distance_m") if isinstance(p.get("distance_m"), (int, float)) else float('inf')
+        )
+    enriched.sort(key=sort_key)
+    return enriched[:5]
 
 def _print_msg(conv_id: str, phone: str | None, role: str, text: str) -> None:
     try:
